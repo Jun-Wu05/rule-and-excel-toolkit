@@ -1,0 +1,6 @@
+# rule-and-excel-toolkit-dsh bundle patch: mount the skill provider into the
+# host skill registry (host-plane row, merged into every agent preset's scope
+# chain).
+- insert:
+    - id: rule-and-excel-toolkit-dsh
+      name: 'rule-and-excel-toolkit-dsh'

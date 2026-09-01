@@ -1,0 +1,10 @@
+# Python 运行时产物
+__pycache__/
+*.py[cod]
+
+# 运行时环境记录（skill 在用户工作目录生成，不进仓库）
+.dsh/
+
+# 依赖 / 构建产物
+node_modules/
+.DS_Store

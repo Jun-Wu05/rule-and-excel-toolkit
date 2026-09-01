@@ -1,0 +1,4 @@
+# Excel 类脚本（excel_*.py）的运行时第三方依赖。
+# 解析规则类脚本只用 Python 标准库，无需安装任何东西。
+pandas
+openpyxl

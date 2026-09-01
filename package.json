@@ -1,0 +1,50 @@
+{
+  "name": "rule-and-excel-toolkit-dsh",
+  "version": "0.1.0",
+  "description": "DSH 插件化的 rule-and-excel-toolkit 技能：解析规则批处理 + Excel 日志加工执行型工具集。",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "skills",
+    "cordis.patch.yml",
+    "requirements.txt",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "plugin",
+    "skill",
+    "excel",
+    "rule",
+    "log",
+    "pandas",
+    "openpyxl"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Jun-Wu05/rule-and-excel-toolkit.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Jun-Wu05/rule-and-excel-toolkit/issues"
+  },
+  "homepage": "https://github.com/Jun-Wu05/rule-and-excel-toolkit",
+  "scripts": {
+    "verify": "node verify.mjs",
+    "prepublishOnly": "node verify.mjs"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}
