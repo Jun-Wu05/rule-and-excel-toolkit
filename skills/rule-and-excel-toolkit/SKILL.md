@@ -1,6 +1,6 @@
 ---
 name: rule-and-excel-toolkit
-description: 解析规则批处理与 Excel 日志数据加工的执行型工具集。当用户需要处理 Base64 编码的解析规则 JSON 时触发——按 ref 父子关系生成多级层级编号、清空 normalize 中指定 field、替换顶层规则 UUID 并同步所有引用、用 conditionMatch 把入口规则与子规则组装成规则链；或需要对设备/日志 Excel 做按 IP 关联汇总并拆分多 Sheet、从日志列用 JSON+正则双策略提取多个字段、按关键词筛选日志行时触发。脚本通用，输入输出路径、字段名、前缀/后缀均可通过命令行参数传入。不用于官网页面生成、普通文档处理或与解析规则/日志 Excel 无关的通用编程。
+description: 解析规则批处理与 Excel 日志数据加工的执行型工具集。当用户需要处理 Base64 编码的解析规则 JSON 时触发——按 ref 父子关系生成多级层级编号、清空 normalize 中指定 field、替换顶层规则 UUID 并同步所有引用（含复制/克隆规则）、用 conditionMatch 把入口规则与子规则组装成规则链；或需要对设备/日志 Excel 做按 IP 关联汇总并拆分多 Sheet、从日志列用 JSON+正则双策略提取多个字段、按关键词筛选日志行、按某字段去重并拆多 Sheet 时触发。脚本通用，输入输出路径、字段名、前缀/后缀均可通过命令行参数传入。不用于官网页面生成、普通文档处理或与解析规则/日志 Excel 无关的通用编程。
 ---
 
 # 解析规则与 Excel 日志加工工具集（执行型）
@@ -29,7 +29,7 @@ description: 解析规则批处理与 Excel 日志数据加工的执行型工具
 ## 什么时候触发
 
 - 用户拿到一段 Base64 字符串或一个 Base64 txt 文件，说是"解析规则""规则导出""normalize 规则"，要改里面的内容。
-- 用户要给解析规则加层级编号、加名称前缀/后缀、换 UUID、清空某个字段、把多条规则组装成规则链。
+- 用户要给解析规则加层级编号、加名称前缀/后缀、换 UUID（含复制/克隆规则）、清空某个字段、把多条规则组装成规则链。
 - 用户要把设备清单和多份原始日志 Excel 按 IP 关联、汇总、拆成多 Sheet。
 - 用户要从日志 Excel 的某一列里提取多个 JSON 字段，或按关键词筛选日志行，或按某个字段值拆成多 Sheet。
 
@@ -44,14 +44,22 @@ description: 解析规则批处理与 Excel 日志数据加工的执行型工具
 
 | 输入形态 | 用户要做的事 | 用哪个脚本 |
 |---|---|---|
-| Base64 txt（解码后是规则 JSON 数组） | 加层级编号前缀 | `rule_hierarchy_number.py` |
+| Base64 txt（解码后是规则 JSON 数组） | 加层级编号（01_/0101_） | `rule_hierarchy_number.py` |
 | Base64 txt | 清空 normalize 中某个 field | `rule_clear_field.py` |
-| Base64 txt | 换 UUID（+加 name 前缀/后缀） | `rule_replace_uuid.py` |
+| Base64 txt | 换 UUID / 复制规则（可顺带改 name） | `rule_replace_uuid.py` |
 | Base64 txt | 入口规则+子规则组装成规则链 | `rule_link_conditionmatch.py` |
 | .xlsx 设备清单 + 多份日志 xlsx | 按 IP 关联、汇总、拆多 Sheet | `excel_device_log_join.py` |
-| .xlsx 含日志列 | 从日志列提取多个 JSON 字段 | `excel_extract_log_fields.py` |
+| .xlsx 含日志列 | 从日志列提取多个 JSON 字段（保留原列） | `excel_extract_log_fields.py` |
 | .xlsx 含日志列 | 按关键词筛选行 | `excel_filter_logs.py` |
-| .xlsx 含日志列 | 按 deviceAddress 去重并拆多 Sheet | `excel_split_by_deviceaddress.py` |
+| .xlsx 含日志列 | 按某字段去重并拆多 Sheet（默认 deviceAddress） | `excel_split_by_deviceaddress.py` |
+
+「加前缀/加后缀」「加层级编号」「换 UUID（复制规则）」容易被混用，触发不同脚本、改不同的东西。按下表一对一映射，不要混用：
+
+| 用户原话 | 含义 | 用哪个脚本 + 参数 |
+|---|---|---|
+| 「加前缀 / 加后缀 / 前面加 XXX / 后面加 _0731」 | 只改 name，加字面前缀/后缀，**UUID 不动** | `rule_replace_uuid.py --prefix 前缀 [--suffix 后缀] --prefix-only` |
+| 「加层级编号 / 按父子加编号 / 01_ / 0101_」 | 按 ref 层级生成数字编号，**一定带数字** | `rule_hierarchy_number.py [--prefix 前缀]` |
+| 「换 UUID / 重新出规则 ID / 复制规则 / 克隆规则」 | 顶层换新 UUID + 同步引用，可顺带改 name | `rule_replace_uuid.py [--prefix 前缀] [--suffix 后缀]` |
 
 不确定输入是哪种时，先解码看一眼：Base64 解码后是 `[ {...}, {...} ]` 且元素含 `id`/`name`/`normalize`/`parser` → 解析规则；否则多半是 Excel。
 
@@ -100,14 +108,15 @@ python scripts/rule_clear_field.py <输入.txt> <输出.txt> --fields=location_c
 
 **字段名可能出现在两处**：同一个名字（如 `event_name`）可能既是 `normalize[].field` 的值，又是 `parser.filter[].fields` 里的 key（addFields 过滤器给日志打字段值，常有 `'网络连接'` 这类实际值）。本脚本只处理 `normalize` 里的。处理前先解码确认该名字出现在哪些位置；如果用户想动的其实不在 normalize，或两处都要动，要跟用户确认范围再处理。
 
-### 3. rule_replace_uuid.py — 替换顶层规则 UUID + 加 name 前缀/后缀
+### 3. rule_replace_uuid.py — 换顶层 UUID（+ 改 name），或只改 name
 
-只替换每条顶层规则的 `id`（生成新 UUID），递归把所有引用到旧 UUID 的地方同步换成新 UUID，保证层级引用不断裂；可选给顶层 `name` 加前缀和/或后缀（幂等，防重复叠加）。只改顶层规则 UUID 和顶层 name，不碰 `deviceType.id`、`filter.id`、`deviceType.name`、`parser.name` 等。
+只替换每条顶层规则的 `id`（生成新 UUID），递归把所有引用到旧 UUID 的地方同步换成新 UUID，保证层级引用不断裂；可选给顶层 `name` 加前缀和/或后缀（幂等，防重复叠加）。只改顶层规则 UUID 和顶层 name，不碰 `deviceType.id`、`filter.id`、`deviceType.name`、`parser.name` 等。**复制/克隆规则**（需要新 UUID 避免与原件冲突）走默认模式（换 UUID + 可选改 name）。
 
 ```bash
-python scripts/rule_replace_uuid.py <输入.txt> [输出.txt] [--prefix 前缀] [--suffix 后缀] [--verify]
+python scripts/rule_replace_uuid.py <输入.txt> [输出.txt] [--prefix 前缀] [--suffix 后缀] [--verify] [--prefix-only]
 ```
 - `--prefix`/`--suffix`：给顶层 name 加前缀/后缀，如 `--suffix _0731`。可同时用，也可都不用（仅换 UUID）。
+- `--prefix-only`：只改顶层 name 前缀/后缀，**跳过 UUID 替换**（所有 ID 一律不动）。「只加前缀」用这个。
 - `--verify`：跑完后打印每条规则 id/name 和引用一致性校验。
 - 输出默认输入同名加 `_reuuid`。
 
@@ -138,7 +147,7 @@ python scripts/excel_device_log_join.py <设备清单.xlsx> <输出.xlsx> <日�
 
 ### 6. excel_extract_log_fields.py — 从日志列提取多个 JSON 字段
 
-读取 Excel 中的日志列，对每行用「JSON 解析优先 + 安全正则兜底」双策略提取指定字段，展开成多列输出。默认提取 `deviceName`/`deviceAddress`/`deviceProductType`/`productVendorName`/`deviceSendProductName`/`rawEvent`。自动清除 Excel 不支持的控制字符；默认输出 `_diag` 诊断列。
+读取 Excel 中的日志列，对每行用「JSON 解析优先 + 安全正则兜底」双策略提取指定字段，**保留原始所有列并追加提取列**（原始列不丢）。默认提取 `deviceName`/`deviceAddress`/`deviceProductType`/`productVendorName`/`deviceSendProductName`/`rawEvent`。自动清除 Excel 不支持的控制字符；默认输出 `_diag` 诊断列。
 
 ```bash
 python scripts/excel_extract_log_fields.py <输入.xlsx> [输出.xlsx] \
@@ -159,16 +168,17 @@ python scripts/excel_filter_logs.py <输入.xlsx> [输出.xlsx] [--keyword 关�
 - `--column`：默认 `原始日志`。
 - 输出默认输入同名加 `_筛选`。跑完打印命中行数并预览前 3 条。
 
-### 8. excel_split_by_deviceaddress.py — 按 deviceAddress 拆 Sheet
+### 8. excel_split_by_deviceaddress.py — 按指定字段去重 + 拆多 Sheet
 
-读取 Excel，对日志列用「JSON 优先 + 正则兜底」提取指定字段，输出三类 Sheet：`原始全量数据`（全量）、`deviceAddress去重`（按 deviceAddress 保留首条）、每个不同 deviceAddress 一个独立 Sheet（Sheet 名为该 deviceAddress）。自动清除 Excel 不支持的控制字符。
+读取 Excel，对日志列用「JSON 优先 + 正则兜底」提取指定字段，**保留原始所有列并追加提取列**。输出三类 Sheet：`原始全量数据`（全量）、`<字段>去重`（按 `--split-field` 去重保留首条）、每个不同字段值一个独立 Sheet（Sheet 名为该值）。默认按 `deviceAddress` 拆分，用 `--split-field` 可换成任意字段。自动清除 Excel 不支持的控制字符。
 
 ```bash
 python scripts/excel_split_by_deviceaddress.py <输入.xlsx> <输出.xlsx> \
-  [--log-column 原始日志] [--fields f1,f2,...]
+  [--log-column 原始日志] [--fields f1,f2,...] [--split-field 字段]
 ```
 - `<输出.xlsx>` 是**必填**位置参数（与其它 Excel 脚本不同，此脚本输出不默认带后缀）。
 - `--fields`：默认 `deviceName,productVendorName,deviceSendProductName,dvcAddress,rawEvent,deviceAddress,dataType`。
+- `--split-field`：按哪一列去重并拆 Sheet，默认 `deviceAddress`；可换成任意已存在的列（原始列或提取列）。
 - `--log-column`：默认 `原始日志`。
 - 跑完打印 Sheet 列表和每个字段的非空统计。
 

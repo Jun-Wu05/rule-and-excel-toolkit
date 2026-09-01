@@ -1,6 +1,6 @@
 {
   "name": "rule-and-excel-toolkit-dsh",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "DSH 插件化的 rule-and-excel-toolkit 技能：解析规则批处理 + Excel 日志加工执行型工具集。",
   "type": "module",
   "main": "lib/index.js",

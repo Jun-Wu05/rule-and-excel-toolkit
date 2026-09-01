@@ -7,13 +7,14 @@ Base64 解析规则修改工具（执行型）
 - 可选给顶层 name 加前缀或后缀（幂等，防重复叠加）
 
 命令行用法：
-    python rule_replace_uuid.py <输入文件> [输出文件] [--prefix 前缀] [--suffix 后缀] [--verify]
+    python rule_replace_uuid.py <输入文件> [输出文件] [--prefix 前缀] [--suffix 后缀] [--verify] [--prefix-only]
 
     输入文件：Base64 编码的解析规则 JSON 文本文件
     输出文件：默认在输入文件同目录，文件名加 _reuuid 后缀
     --prefix：给顶层 name 加前缀，如 --prefix 南方电网_
     --suffix：给顶层 name 加后缀，如 --suffix _0731
     --prefix 与 --suffix 可同时使用，也可都不用（只换 UUID 不改 name）
+    --prefix-only：只改顶层 name 前缀/后缀，跳过 UUID 替换（所有 ID 一律不动）
     --verify：跑完后打印 UUID 替换与引用一致性校验
 """
 
@@ -89,8 +90,8 @@ def modify_top_level_names(data_array: list, prefix: str = "", suffix: str = "")
     return changed
 
 
-def process(b64_input: str, prefix: str = "", suffix: str = "") -> str:
-    """主处理流程：解码 → 换 UUID → 改 name → 重新编码"""
+def process(b64_input: str, prefix: str = "", suffix: str = "", replace_uuids: bool = True) -> str:
+    """主处理流程：解码 →（可选换 UUID）→ 改 name → 重新编码"""
     # 1. Base64 解码 → JSON
     clean = b64_input.strip().replace('\n', '').replace('\r', '').replace(' ', '')
     decoded = base64.b64decode(clean).decode('utf-8')
@@ -101,15 +102,16 @@ def process(b64_input: str, prefix: str = "", suffix: str = "") -> str:
 
     print(f"[INFO] 共 {len(data_array)} 条规则")
 
-    # 2. 收集顶层规则 UUID 映射（仅此一步决定哪些 ID 会变）
-    uuid_mapping = collect_rule_uuid_mapping(data_array)
-    print(f"[INFO] 共 {len(uuid_mapping)} 个规则 UUID 需要替换")
-    for old, new in uuid_mapping.items():
-        print(f"       {old}  →  {new}")
-
-    # 3. 深拷贝后递归替换所有引用（保证层级一致）
+    # 2-3. 换 UUID（--prefix-only 时跳过，任何 ID 都不动）
     data_array = copy.deepcopy(data_array)
-    replace_rule_uuids_recursive(data_array, uuid_mapping)
+    if replace_uuids:
+        uuid_mapping = collect_rule_uuid_mapping(data_array)
+        print(f"[INFO] 共 {len(uuid_mapping)} 个规则 UUID 需要替换")
+        for old, new in uuid_mapping.items():
+            print(f"       {old}  →  {new}")
+        replace_rule_uuids_recursive(data_array, uuid_mapping)
+    else:
+        print("[INFO] --prefix-only：跳过 UUID 替换，仅改 name")
 
     # 4. 改顶层 name（前缀/后缀，可选）
     if prefix or suffix:
@@ -203,6 +205,7 @@ def parse_args(argv):
     p.add_argument("output", nargs="?", default=None, help="输出文件，默认输入同名加 _reuuid")
     p.add_argument("--prefix", default="", help="给顶层 name 加前缀，如 南方电网_")
     p.add_argument("--suffix", default="", help="给顶层 name 加后缀，如 _0731")
+    p.add_argument("--prefix-only", action="store_true", help="只给顶层 name 加前缀/后缀，跳过 UUID 替换")
     p.add_argument("--verify", action="store_true", help="跑完后打印引用一致性校验")
     return p.parse_args(argv)
 
@@ -222,7 +225,8 @@ def main():
     print(f"  输出: {output_path}")
     print(f"  name 改写: {('前缀=' + args.prefix) if args.prefix else ''}"
           f"{(' 后缀=' + args.suffix) if args.suffix else ''}"
-          f"{' (仅换UUID,不改name)' if not (args.prefix or args.suffix) else ''}")
+          f"{' (仅换UUID,不改name)' if not (args.prefix or args.suffix) else ''}"
+          f"{' (--prefix-only: 不换UUID)' if args.prefix_only else ''}")
     print("=" * 60)
 
     if not os.path.exists(input_path):
@@ -232,7 +236,7 @@ def main():
     with open(input_path, 'r', encoding='utf-8') as f:
         b64_data = f.read()
 
-    result = process(b64_data, prefix=args.prefix, suffix=args.suffix)
+    result = process(b64_data, prefix=args.prefix, suffix=args.suffix, replace_uuids=not args.prefix_only)
 
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(result)

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Excel 日志字段提取工具（执行型）
-读取 Excel 中的日志列，对每行用「JSON 解析优先 + 安全正则兜底」双策略提取指定字段，展开成多列输出。
+读取 Excel 中的日志列，对每行用「JSON 解析优先 + 安全正则兜底」双策略提取指定字段，保留原始所有列并追加提取列。
 
 命令行用法：
     python excel_extract_log_fields.py <输入文件> [输出文件] [--log-column 列名] [--fields f1,f2,...] [--no-diag]
@@ -117,16 +117,17 @@ def process_excel(input_path, output_path, log_column="原始日志",
     extracted = df[log_column].apply(
         lambda s: extract_fields_from_log(s, target_fields, field_patterns)
     )
-    result_df = pd.DataFrame(extracted.tolist())
+    extracted_df = pd.DataFrame(extracted.tolist())
 
-    result_df.insert(0, log_column, df[log_column].values)
+    # 只清洗新提取的列；原始列原样保留
+    for col in extracted_df.columns:
+        extracted_df[col] = extracted_df[col].apply(_clean_for_excel)
 
-    for col in result_df.columns:
-        result_df[col] = result_df[col].apply(_clean_for_excel)
+    if not enable_diag and "_diag" in extracted_df.columns:
+        extracted_df.drop(columns=["_diag"], inplace=True)
 
-    if not enable_diag and "_diag" in result_df.columns:
-        result_df.drop(columns=["_diag"], inplace=True)
-
+    # 保留所有原始列 + 追加提取列
+    result_df = pd.concat([df, extracted_df], axis=1)
     result_df.to_excel(output_path, index=False)
     print(f"✅ 完成! 输出: {output_path}")
     print(f"   列: {list(result_df.columns)}")

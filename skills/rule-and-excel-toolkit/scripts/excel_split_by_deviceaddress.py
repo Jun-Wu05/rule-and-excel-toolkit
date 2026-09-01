@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-按 deviceAddress 拆 Sheet 的日志加工脚本（执行型）
+按指定字段拆 Sheet 的日志加工脚本（执行型）
 - 从 原始日志 列解析 JSON，提取指定字段；
-- 保留原始日志列；
+- 保留原始所有列，并追加提取字段列；
 - 首页：原始全量数据；
-- 第二页：按 deviceAddress 去重（保留首条）；
-- 之后每个不同 deviceAddress 一个独立 Sheet，名为该 deviceAddress。
+- 第二页：按 --split-field 去重（保留首条，默认 deviceAddress）；
+- 之后每个不同字段值一个独立 Sheet，Sheet 名为该值。
 """
 
 import argparse
@@ -74,7 +74,7 @@ def extract_one(log_str, target_fields):
     return result, True
 
 
-def process(input_path, output_path, log_column, target_fields):
+def process(input_path, output_path, log_column, target_fields, split_field="deviceAddress"):
     print(f"📂 读取: {input_path}")
     df = pd.read_excel(input_path, dtype=object)
     if log_column not in df.columns:
@@ -84,15 +84,18 @@ def process(input_path, output_path, log_column, target_fields):
     extracted = df[log_column].apply(lambda s: extract_one(s, target_fields))
     field_df = pd.DataFrame([r for r, _ in extracted], index=df.index)
 
-    # 组装结果列：原始日志列 + 7个字段列
-    out = pd.concat([df[[log_column]], field_df[target_fields]], axis=1)
+    # 保留所有原始列 + 追加提取列
+    out = pd.concat([df, field_df[target_fields]], axis=1)
     out = out.applymap(clean_for_excel)
 
-    # 去重页（按 deviceAddress 保留首条）
-    dedup = out.drop_duplicates(subset=["deviceAddress"], keep="first").reset_index(drop=True)
+    if split_field not in out.columns:
+        raise ValueError(f"❌ 未找到拆分字段 '{split_field}'，可用列: {list(out.columns)}")
 
-    distinct = list(dict.fromkeys(out["deviceAddress"].astype(str).tolist()))
-    print(f"   全量 {len(out)} 行；去重后 {len(dedup)} 行；不同 deviceAddress 共 {len(distinct)} 个")
+    # 去重页（按 split_field 保留首条）
+    dedup = out.drop_duplicates(subset=[split_field], keep="first").reset_index(drop=True)
+
+    distinct = list(dict.fromkeys(out[split_field].astype(str).tolist()))
+    print(f"   全量 {len(out)} 行；去重后 {len(dedup)} 行；不同 {split_field} 共 {len(distinct)} 个")
 
     wb = Workbook()
     wb.remove(wb.active)
@@ -111,11 +114,11 @@ def process(input_path, output_path, log_column, target_fields):
 
     # 首页：原始全量
     write_sheet("原始全量数据", out)
-    # 第二页：按 deviceAddress 去重
-    write_sheet("deviceAddress去重", dedup)
-    # 之后：每个 deviceAddress 一个 sheet
+    # 第二页：按 split_field 去重
+    write_sheet(f"{split_field}去重", dedup)
+    # 之后：每个字段值一个 sheet
     for addr in distinct:
-        sub = out[out["deviceAddress"].astype(str) == addr].reset_index(drop=True)
+        sub = out[out[split_field].astype(str) == addr].reset_index(drop=True)
         write_sheet(addr, sub)
 
     wb.save(output_path)
@@ -133,9 +136,10 @@ def main():
     p.add_argument("output")
     p.add_argument("--log-column", default="原始日志")
     p.add_argument("--fields", default="deviceName,productVendorName,deviceSendProductName,dvcAddress,rawEvent,deviceAddress,dataType")
+    p.add_argument("--split-field", default="deviceAddress", help="按该列去重并拆 Sheet（默认 deviceAddress）")
     a = p.parse_args(sys.argv[1:])
     fields = [f.strip() for f in a.fields.split(",") if f.strip()]
-    process(a.input, a.output, a.log_column, fields)
+    process(a.input, a.output, a.log_column, fields, a.split_field)
 
 
 if __name__ == "__main__":
