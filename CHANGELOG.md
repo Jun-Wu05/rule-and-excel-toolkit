@@ -2,6 +2,21 @@
 
 本项目显著变更的记录，按 [Keep a Changelog](https://keepachangelog.com/zh-CN/) 风格维护，版本号遵循 [SemVer](https://semver.org/lang/zh-CN/)。
 
+## [0.2.0] - 2026-09-03
+
+### Added
+- `excel_extract_log_fields.py` 新增键值对日志格式支持（`key="value"|||` 管道分隔），与 JSON 体自动双格式适配；此前该格式会静默提取出全空列。
+- `excel_extract_log_fields.py` 新增截断兜底：源文件被 Excel 32767 字符单元格上限截断、值有起始引号无闭合引号时，尽力提取到串尾并标记 `TRUNCATED_TAIL` 诊断。
+- `excel_extract_log_fields.py` 新增 `--verify-sample N`：随机抽 N 行做「提取值 == 日志原文值」独立回对，捕获静默漏提。
+- 新增 `excel_inspect.py`：只读预检工具——日志格式识别、目标字段出现率/非空率、截断风险行数、空日志行数。
+- 新增 `excel_dedup_sheets.py`：按指定列去重保留首条，每列一个 `<列名>去重` Sheet；提取逻辑复用主提取脚本。
+
+### Changed
+- `excel_extract_log_fields.py` 的 JSON 策略改为「仅在真正解析出 dict 时短路」，修复「日志含 `{` 但解析失败时带着空结果提前返回」的问题。
+- 诊断码统一为 `OK` / `EMPTY_INPUT` / `TRUNCATED_TAIL` / `REGEX_MISS(matched=x/y)` / `RAW_EVENT_IS_NULL`，含义写入 SKILL.md。
+- SKILL.md：「标准动作」新增 Excel 任务先预检一步；选型表登记两个新脚本；「重要边界」改为两级表述（列名不匹配用参数；格式不匹配允许工作区变体但须提醒登记回仓库）；新增 32767 截断失败模式说明。
+- CONTEXT.md 补充 键值对日志 / 去重 Sheet / 预检 / 截断行 / 抽查回对 术语。
+
 ## [0.1.1] - 2026-09-01
 
 ### Fixed

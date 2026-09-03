@@ -1,6 +1,6 @@
 ---
 name: rule-and-excel-toolkit
-description: 解析规则批处理与 Excel 日志数据加工的执行型工具集。当用户需要处理 Base64 编码的解析规则 JSON 时触发——按 ref 父子关系生成多级层级编号、清空 normalize 中指定 field、替换顶层规则 UUID 并同步所有引用（含复制/克隆规则）、用 conditionMatch 把入口规则与子规则组装成规则链；或需要对设备/日志 Excel 做按 IP 关联汇总并拆分多 Sheet、从日志列用 JSON+正则双策略提取多个字段、按关键词筛选日志行、按某字段去重并拆多 Sheet 时触发。脚本通用，输入输出路径、字段名、前缀/后缀均可通过命令行参数传入。不用于官网页面生成、普通文档处理或与解析规则/日志 Excel 无关的通用编程。
+description: 解析规则批处理与 Excel 日志数据加工的执行型工具集。当用户需要处理 Base64 编码的解析规则 JSON 时触发——按 ref 父子关系生成多级层级编号、清空 normalize 中指定 field、替换顶层规则 UUID 并同步所有引用（含复制/克隆规则）、用 conditionMatch 把入口规则与子规则组装成规则链；或需要对设备/日志 Excel 做按 IP 关联汇总并拆分多 Sheet、预检日志格式与字段分布、从日志列用 JSON/键值对双格式提取多个字段、按关键词筛选日志行、按某字段去重并拆多 Sheet、按指定列去重生成汇总 Sheet 时触发。脚本通用，输入输出路径、字段名、前缀/后缀均可通过命令行参数传入。不用于官网页面生成、普通文档处理或与解析规则/日志 Excel 无关的通用编程。
 ---
 
 # 解析规则与 Excel 日志加工工具集（执行型）
@@ -10,10 +10,11 @@ description: 解析规则批处理与 Excel 日志数据加工的执行型工具
 被调用后的标准动作：
 
 1. 识别用户输入属于哪一类（解析规则 Base64，还是 Excel 文件），缺关键参数时只问一次。
-2. 把用户的输入文件、输出文件、处理参数（前缀/后缀/字段名/关键词等）组装成命令行，直接用 shell（DSH 中是 pwsh）执行对应脚本。
-3. 脚本输出仍是与用户输入同格式的文件（解析规则→Base64 txt，Excel→xlsx）。默认输出到输入文件同目录、文件名加处理后缀，也可由用户指定。
-4. 读脚本打印的执行日志，确认规则数、改名/换 UUID 数量、引用一致性等；跑完用脚本自带的 `--verify` 或诊断信息判断是否成功。
-5. 把**最终结果文件的绝对路径**告诉用户，并简要说明做了什么、验证结论是什么。
+2. **Excel 提取/去重/拆分类任务，先跑 `scripts/excel_inspect.py` 预检**：确认日志列格式（JSON 体 / 键值对）、目标字段出现率、有无 32767 字符截断风险，再选提取参数；预检是只读的，不会改文件。
+3. 把用户的输入文件、输出文件、处理参数（前缀/后缀/字段名/关键词等）组装成命令行，直接用 shell（DSH 中是 pwsh）执行对应脚本。
+4. 脚本输出仍是与用户输入同格式的文件（解析规则→Base64 txt，Excel→xlsx）。默认输出到输入文件同目录、文件名加处理后缀，也可由用户指定。
+5. 读脚本打印的执行日志，确认规则数、改名/换 UUID 数量、引用一致性等；跑完用脚本自带的 `--verify`、`--verify-sample` 或诊断信息判断是否成功。
+6. 把**最终结果文件的绝对路径**告诉用户，并简要说明做了什么、验证结论是什么。
 
 所有脚本在 `scripts/` 目录下，已统一支持命令行参数，无需改脚本源码。
 
@@ -31,7 +32,7 @@ description: 解析规则批处理与 Excel 日志数据加工的执行型工具
 - 用户拿到一段 Base64 字符串或一个 Base64 txt 文件，说是"解析规则""规则导出""normalize 规则"，要改里面的内容。
 - 用户要给解析规则加层级编号、加名称前缀/后缀、换 UUID（含复制/克隆规则）、清空某个字段、把多条规则组装成规则链。
 - 用户要把设备清单和多份原始日志 Excel 按 IP 关联、汇总、拆成多 Sheet。
-- 用户要从日志 Excel 的某一列里提取多个 JSON 字段，或按关键词筛选日志行，或按某个字段值拆成多 Sheet。
+- 用户要从日志 Excel 的某一列里提取多个字段（JSON 或键值对格式均可），或按关键词筛选日志行，或按某个字段值拆成多 Sheet，或按指定列去重出汇总 Sheet。
 
 ## 不使用场景
 
@@ -48,10 +49,12 @@ description: 解析规则批处理与 Excel 日志数据加工的执行型工具
 | Base64 txt | 清空 normalize 中某个 field | `rule_clear_field.py` |
 | Base64 txt | 换 UUID / 复制规则（可顺带改 name） | `rule_replace_uuid.py` |
 | Base64 txt | 入口规则+子规则组装成规则链 | `rule_link_conditionmatch.py` |
+| .xlsx 含日志列 | 提取/去重/拆分前先预检格式与字段分布（只读） | `excel_inspect.py` |
 | .xlsx 设备清单 + 多份日志 xlsx | 按 IP 关联、汇总、拆多 Sheet | `excel_device_log_join.py` |
-| .xlsx 含日志列 | 从日志列提取多个 JSON 字段（保留原列） | `excel_extract_log_fields.py` |
+| .xlsx 含日志列 | 从日志列提取多个字段（JSON/键值对双格式，保留原列） | `excel_extract_log_fields.py` |
 | .xlsx 含日志列 | 按关键词筛选行 | `excel_filter_logs.py` |
 | .xlsx 含日志列 | 按某字段去重并拆多 Sheet（默认 deviceAddress） | `excel_split_by_deviceaddress.py` |
+| .xlsx 含日志列 | 按指定列去重保留首条，每列一个 Sheet | `excel_dedup_sheets.py` |
 
 「加前缀/加后缀」「加层级编号」「换 UUID（复制规则）」容易被混用，触发不同脚本、改不同的东西。按下表一对一映射，不要混用：
 
@@ -145,17 +148,19 @@ python scripts/excel_device_log_join.py <设备清单.xlsx> <输出.xlsx> <日�
 ```
 所有列名参数都可按实际表头改。列名对不上会报错并列出可用列名，据此调整 `--*-col` 即可。
 
-### 6. excel_extract_log_fields.py — 从日志列提取多个 JSON 字段
+### 6. excel_extract_log_fields.py — 从日志列提取多个字段（JSON/键值对双格式）
 
-读取 Excel 中的日志列，对每行用「JSON 解析优先 + 安全正则兜底」双策略提取指定字段，**保留原始所有列并追加提取列**（原始列不丢）。默认提取 `deviceName`/`deviceAddress`/`deviceProductType`/`productVendorName`/`deviceSendProductName`/`rawEvent`。自动清除 Excel 不支持的控制字符；默认输出 `_diag` 诊断列。
+读取 Excel 中的日志列，对每行用「JSON 解析优先 + JSON 正则兜底 + 键值对正则兜底 + 截断兜底」多策略提取指定字段，**保留原始所有列并追加提取列**（原始列不丢）。自动适配两种日志形态：JSON 体（`"field":"value"`）和管道键值对（`field="value"|||`，如 `node_ip="10.0.0.1"`）。默认提取 `deviceName`/`deviceAddress`/`deviceProductType`/`productVendorName`/`deviceSendProductName`/`rawEvent`。自动清除 Excel 不支持的控制字符；默认输出 `_diag` 诊断列。
 
 ```bash
 python scripts/excel_extract_log_fields.py <输入.xlsx> [输出.xlsx] \
-  [--log-column 原始日志] [--fields f1,f2,...] [--no-diag]
+  [--log-column 原始日志] [--fields f1,f2,...] [--no-diag] [--verify-sample 20]
 ```
 - `--fields`：逗号分隔的字段列表，覆盖默认 6 个字段。
 - `--no-diag`：不输出诊断列。
+- `--verify-sample N`：写完输出后随机抽 N 行做「提取值 == 日志原文值」独立回对，打印通过率与失败明细。**静默漏提（原文有值、提取为空）会被判失败**，建议重要任务都带上。
 - 输出默认输入同名加 `_提取`。
+- 诊断码含义：`OK` 正常；`EMPTY_INPUT` 日志为空；`TRUNCATED_TAIL` 源文件被 Excel 32767 字符单元格上限截断，该行提取值不完整（**源头截断，非提取错误**，精确值只能从原始日志系统重新导出）；`REGEX_MISS(x/y)` 有 y 个字段中 x 个未在日志中找到。
 
 ### 7. excel_filter_logs.py — 按关键词筛选日志行
 
@@ -182,16 +187,40 @@ python scripts/excel_split_by_deviceaddress.py <输入.xlsx> <输出.xlsx> \
 - `--log-column`：默认 `原始日志`。
 - 跑完打印 Sheet 列表和每个字段的非空统计。
 
+### 9. excel_inspect.py — 日志预检（只读）
+
+跑提取/去重/拆分类脚本**之前**先看一眼数据：行列数、列名、Sheet 列表、日志格式识别（JSON 体 / 键值对 / 未知）、目标字段出现率与非空率、超 32767 字符的截断风险行数、空日志行数。只读不写，不产生输出文件。
+
+```bash
+python scripts/excel_inspect.py <输入.xlsx> [--log-column 原始日志] [--fields f1,f2,...] [--sample 200]
+```
+- `--fields`：关心的字段，逗号分隔，默认 `node_ip,node_name,log_msg`。
+- `--sample`：格式识别抽样行数，默认 200。
+- 用途：确认格式能被提取脚本覆盖、字段名没写错、预估截断影响面，避免跑完才发现全空列。
+
+### 10. excel_dedup_sheets.py — 按指定列去重，每列一个 Sheet
+
+读取 Excel，从日志列提取指定字段（复用 `excel_extract_log_fields.py` 的全套提取策略，已存在的同名列自动跳过），**保留原始所有列并追加提取列**；然后按指定列分别去重（保留首条），输出 `全量数据` + 每个去重列一个 `<列名>去重` Sheet。与 `excel_split_by_deviceaddress.py` 的区别：那个按字段值分组、每个值一个 Sheet；本脚本按列去重只留每个值的首条，适合「看有哪些不同的事件/类型」。
+
+```bash
+python scripts/excel_dedup_sheets.py <输入.xlsx> <输出.xlsx> \
+  [--log-column 原始日志] [--fields log_msg] --dedup-cols 列1,列2
+```
+- `--dedup-cols`：**必填**，要按其去重的列（可多个），逗号分隔。
+- `--fields`：要从日志列提取的字段，默认 `log_msg`。
+- 跑完打印每个 Sheet 的行数、唯一值数、空值行保留数，以及提取诊断统计。
+
 ## 执行后怎么做
 
 - 解析规则类：跑完读日志里的规则数、UUID 替换数、name 改写数；用了 `--verify` 的看引用一致性是否通过。引用一致性报"指向未知 ID"是正常的——原始规则里本来就存在引用项目外规则的情况，只要顶层 UUID 全换、引用同步没断即可。
-- Excel 类：读日志里的行数、命中数、各字段非空统计、诊断分布，判断结果是否符合预期。
+- Excel 类：读日志里的行数、命中数、各字段非空统计、诊断分布，判断结果是否符合预期；用了 `--verify-sample` 的看抽查回对是否全过。`TRUNCATED_TAIL` 行数要明确告知用户（值不完整，源头截断）。
 - 把最终结果文件的绝对路径给用户，说明做了什么、验证结论、还剩什么需要手工处理（如 conditionMatch 里的 `'xxx'` 占位值）。
 
 ## 重要边界
 
 - 解析规则改错字段可能让规则在引擎里失效；改之前建议先备份原始 Base64，跑完用 `--verify` 或诊断信息确认。
-- Excel 脚本严格依赖表头列名，列名对不上会直接报错并列出可用列名，按提示用 `--*-col` 调整，不要改脚本源码。
+- **脚本调整的两级边界**：列名对不上 → 列名不匹配会直接报错并列出可用列，按提示用 `--*-col` 参数调整，**不要改脚本源码**；日志格式/提取策略不匹配（预检发现两种格式都不覆盖）→ 允许在工作区建变体脚本应急，但要**明确告知用户**，并建议把变体登记回本 skill 仓库（`scripts/` 目录 + SKILL.md 选型表），避免积累丢失。
 - 输出文件默认写在输入文件同目录，命名加后缀避免覆盖原始文件；用户明确指定输出路径时用用户指定的。
 - 需要新增一个类似场景时，优先复用最接近的脚本加命令行参数，而不是从零重写。
 - 未经用户明确同意，不新建虚拟环境、不安装任何依赖。
+- 源 Excel 若被 Excel 单元格 32767 字符上限截断（预检会标出），提取值只能尽力到截断处，诊断标 `TRUNCATED_TAIL`；不要试图"修复"截断值，向用户说明源头问题即可。
