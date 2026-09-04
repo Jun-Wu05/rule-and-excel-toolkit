@@ -42,9 +42,11 @@ def detect_log_format(log_str):
                 return "json"
         except json.JSONDecodeError:
             pass
-    # kv 风格: key="value" 出现多次（管道分隔日志）
-    kv_hits = len(re.findall(r'[A-Za-z_][A-Za-z0-9_]*="', log_str))
-    if kv_hits >= 3:
+    # kv 风格: 带引号 key="value" 至少 1 个，或不带引号 key=value 出现 3 次以上
+    # （syslog 风格日志常只有个别键带引号，如 GenTime="..." SrcIP= DstIP=）
+    kv_quoted = len(re.findall(r'[A-Za-z_][A-Za-z0-9_]*="', log_str))
+    kv_plain = len(re.findall(r'[A-Za-z_][A-Za-z0-9_]*=(?!=)', log_str))
+    if kv_quoted >= 1 or kv_plain >= 3:
         return "kv"
     return "unknown"
 

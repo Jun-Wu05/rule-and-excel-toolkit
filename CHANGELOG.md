@@ -8,7 +8,7 @@
 - `excel_extract_log_fields.py` 新增键值对日志格式支持（`key="value"|||` 管道分隔），与 JSON 体自动双格式适配；此前该格式会静默提取出全空列。
 - `excel_extract_log_fields.py` 新增截断兜底：源文件被 Excel 32767 字符单元格上限截断、值有起始引号无闭合引号时，尽力提取到串尾并标记 `TRUNCATED_TAIL` 诊断。
 - `excel_extract_log_fields.py` 新增 `--verify-sample N`：随机抽 N 行做「提取值 == 日志原文值」独立回对，捕获静默漏提。
-- 新增 `excel_inspect.py`：只读预检工具——日志格式识别、目标字段出现率/非空率、截断风险行数、空日志行数。
+- 新增 `excel_inspect.py`：只读预检工具——日志格式识别、目标字段出现率/非空率、截断风险行数、空日志行数。kv 识别覆盖 syslog 风格（带引号键 ≥1 个或不带引号键 ≥3 个）。
 - 新增 `excel_dedup_sheets.py`：按指定列去重保留首条，每列一个 `<列名>去重` Sheet；提取逻辑复用主提取脚本。
 
 ### Changed
