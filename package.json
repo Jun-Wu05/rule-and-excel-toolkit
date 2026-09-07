@@ -1,7 +1,7 @@
 {
   "name": "rule-and-excel-toolkit-dsh",
-  "version": "0.3.0",
-  "description": "DSH 插件化的 rule-and-excel-toolkit 技能：解析规则批处理 + Excel 日志加工执行型工具集。",
+  "version": "0.5.0",
+  "description": "跨 Agent 的 rule-and-excel-toolkit：解析规则批处理 + Excel 日志加工执行型 Skill，并保留 DSH provider bundle 兼容。",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
@@ -18,10 +18,11 @@
     "LICENSE"
   ],
   "keywords": [
+    "agent-skill",
+    "cli",
     "dsh",
     "dsh-plugin",
     "deepseek-harness",
-    "plugin",
     "skill",
     "excel",
     "rule",
