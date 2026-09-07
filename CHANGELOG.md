@@ -2,6 +2,22 @@
 
 本项目显著变更的记录，按 [Keep a Changelog](https://keepachangelog.com/zh-CN/) 风格维护，版本号遵循 [SemVer](https://semver.org/lang/zh-CN/)。
 
+## [0.4.0] - 2026-09-07
+
+### Added
+- 新增 `skills/rule-and-excel-toolkit/references/platform-compatibility.md`，记录跨 Agent 兼容原则与 Python 环境探测方式。
+- SKILL.md 新增统一验证标准：解析规则任务比较处理前后未知引用集合，禁止产生新的未知 UUID 引用；Excel 任务统一检查行数、字段非空率、Sheet/唯一值数量、诊断码、抽查结果与截断风险。
+- SKILL.md 新增代码扩展边界：禁止长期保留 `_new`、`_v2`、`_final`、客户名后缀等复制型变体脚本，优先通过 CLI 参数或公共策略扩展现有脚本。
+
+### Changed
+- SKILL.md 重构为单 Skill 的跨 Agent 执行协议，继续统一管理解析规则与 Excel 日志两类能力，不拆分 Skill。
+- 移除 DSH/pwsh/`.dsh/python-env` 等宿主专属强绑定表述，改为使用当前 Agent 可用的命令执行能力；业务逻辑保持宿主无关。
+- Python Excel 环境探测命令修复为 `python -c "import sys, pandas, openpyxl; print(sys.executable)"`，补齐缺失的 `import sys`。
+- 精简重复的触发、脚本选型和执行说明，将 SKILL.md 定位为“意图识别 + 脚本选择 + 执行约束 + 验证标准”的决策中心。
+- `TRUNCATED_TAIL` 描述由“确定源文件已截断”调整为“达到 Excel 长度上限或表现出疑似截断的风险提示”，避免把风险判断表述为绝对事实。
+- `conditionMatch` 的 `'xxx'` 明确为占位条件：若用户已经提供真实匹配值，不应把占位符作为完整最终交付。
+- 明确已有脚本能够覆盖时不得重新实现同功能逻辑，列名差异优先通过 CLI 参数适配。
+
 ## [0.3.0] - 2026-09-07
 
 ### Added
