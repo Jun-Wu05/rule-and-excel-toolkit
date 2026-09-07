@@ -3,7 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![CI](https://github.com/Jun-Wu05/rule-and-excel-toolkit/actions/workflows/ci.yml/badge.svg)](https://github.com/Jun-Wu05/rule-and-excel-toolkit/actions/workflows/ci.yml)
 
-解析规则批处理 + Excel 日志加工的执行型 Agent Skill。核心业务逻辑保持宿主无关，可由具备文件访问与 Python/命令执行能力的 Agent 调用；DSH、Claude、Codex、GPT、OpenClaw、Hermars 等宿主只负责“如何加载与执行”，不改变 Skill 的业务规则。
+解析规则批处理 + Excel 日志加工的执行型 Agent Skill。核心业务逻辑保持宿主无关，可由具备文件访问与 Python/命令执行能力的 Agent 调用；DSH、Claude、Codex、GPT、OpenClaw、Hermes 等宿主只负责“如何加载与执行”，不改变 Skill 的业务规则。
 
 ## 使用
 
