@@ -1,6 +1,4 @@
-// verify.mjs — CI gate for the rule-and-excel-toolkit-dsh bundle.
-// Checks that the package is a loadable DSH skill bundle carrying one valid
-// skill. Run with `node verify.mjs`; a non-zero exit fails the gate.
+// verify.mjs — repository CI gate.
 import { readFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -10,7 +8,6 @@ const root = dirname(fileURLToPath(import.meta.url))
 const errors = []
 const fail = (msg) => errors.push(msg)
 
-// 1. package.json declares a DSH bundle patch.
 let pkg = null
 try {
   pkg = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'))
@@ -24,9 +21,16 @@ if (pkg) {
   else if (!existsSync(join(root, patch))) fail(`dsh.bundle.patch target missing: ${patch}`)
   if (pkg.type !== 'module') fail('package.json "type" must be "module"')
   if (!Array.isArray(pkg.files) || !pkg.files.includes('skills')) fail('package.json "files" must include "skills"')
+
+  try {
+    const changelog = await readFile(join(root, 'CHANGELOG.md'), 'utf8')
+    const latest = /^## \[([^\]]+)\]/m.exec(changelog)?.[1]
+    if (latest && latest !== pkg.version) fail(`package version ${pkg.version} != latest CHANGELOG version ${latest}`)
+  } catch {
+    fail('cannot read CHANGELOG.md')
+  }
 }
 
-// 2. the provider module loads and declares inject ['skills'].
 const providerUrl = pathToFileURL(join(root, 'lib', 'index.js')).href
 try {
   const mod = await import(providerUrl)
@@ -37,10 +41,19 @@ try {
   fail(`lib/index.js failed to import: ${e.message}`)
 }
 
-// 3. the single skill bundle and every script its body references.
 const skillDir = join(root, 'skills', 'rule-and-excel-toolkit')
 const skillFile = join(skillDir, 'SKILL.md')
-if (!existsSync(skillFile)) fail('skills/rule-and-excel-toolkit/SKILL.md missing')
+const scriptsDir = join(skillDir, 'scripts')
+for (const required of [
+  skillFile,
+  join(scriptsDir, 'toolkit.py'),
+  join(scriptsDir, 'common', 'registry.py'),
+  join(scriptsDir, 'common', 'result.py'),
+  join(scriptsDir, 'common', 'output.py'),
+  join(skillDir, 'references', 'cli-contract.md'),
+]) {
+  if (!existsSync(required)) fail(`required unified CLI file missing: ${required}`)
+}
 
 let skillText = ''
 try {
@@ -57,8 +70,7 @@ if (skillText) {
   if (name !== 'rule-and-excel-toolkit') fail(`SKILL.md name mismatch: "${name}"`)
   if (!desc) fail('SKILL.md description empty')
 
-  const scriptsDir = join(skillDir, 'scripts')
-  const referenced = [...skillText.matchAll(/scripts\/([\w.-]+\.py)/g)].map((m) => m[1])
+  const referenced = [...skillText.matchAll(/scripts\/([\w./-]+\.py)/g)].map((m) => m[1])
   for (const f of new Set(referenced)) {
     if (!existsSync(join(scriptsDir, f))) fail(`SKILL.md references missing script: ${f}`)
   }
@@ -69,4 +81,4 @@ if (errors.length > 0) {
   for (const e of errors) console.error('  - ' + e)
   process.exit(1)
 }
-console.log('verify ok: rule-and-excel-toolkit-dsh bundle is valid')
+console.log('verify ok: skill bundle and unified CLI contract are valid')
