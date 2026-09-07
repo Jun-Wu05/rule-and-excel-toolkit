@@ -20,6 +20,9 @@
 - README.md 与当前跨 Agent 架构同步：项目定位改为宿主无关 Agent Skill，DSH 调整为兼容使用示例；运行环境、验证原则和 split field 描述与 SKILL.md 对齐。
 - CONTEXT.md 与当前术语同步：区分“顶层规则”和“入口规则”，将“复制规则”明确为整批规则克隆；新增外部引用、宿主、环境缓存术语，并把 `TRUNCATED_TAIL` 统一为“截断风险”语义。
 
+### Fixed
+- 修正跨 Agent 示例中的平台名称笔误：`Hermars` → `Hermes`，同步 README.md 与 SKILL.md。
+
 ## [0.3.0] - 2026-09-07
 
 ### Added
