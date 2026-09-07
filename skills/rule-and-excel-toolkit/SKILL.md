@@ -12,7 +12,7 @@ description: 解析规则批处理与 Excel 日志数据加工的执行型工具
 核心原则：
 
 - **单 Skill、多能力域**：解析规则与 Excel 日志处理统一由本 Skill 管理。
-- **宿主无关**：不绑定 DSH、Claude、Codex、GPT、OpenClaw、Hermars 或其他具体 Agent。
+- **宿主无关**：不绑定 DSH、Claude、Codex、GPT、OpenClaw、Hermes 或其他具体 Agent。
 - **优先复用**：已有脚本能完成时，不重新实现同类逻辑。
 - **参数适配优先**：字段名、前后缀、输出路径等差异优先通过 CLI 参数解决。
 - **执行后验证**：任务完成前必须读取脚本日志或验证结果，确认输出可信。
