@@ -2,6 +2,16 @@
 
 本项目显著变更的记录，按 [Keep a Changelog](https://keepachangelog.com/zh-CN/) 风格维护，版本号遵循 [SemVer](https://semver.org/lang/zh-CN/)。
 
+## [0.3.0] - 2026-09-07
+
+### Added
+- 新增 `rule_clone_entry.py`：只克隆入口规则（`subResolver=0`）N 份，子规则一字不改、UUID 不变；每份副本顶层 `id` 换新 UUID、顶层 `name` 加后缀（`--suffixes _new1,_new2`）、内嵌 redirect case 的 analyzer `rule.id` 重生成，`case.rule.ref` 继续引用同一批子规则。区别于 `rule_replace_uuid.py`：后者是整批规则全换 UUID。
+
+### Changed
+- SKILL.md：选型表登记 `rule_clone_entry.py`；新增「只克隆入口规则」小节；frontmatter `description` 补充触发场景。
+- README.md：脚本一览表补充 `rule_clone_entry.py`。
+- CONTEXT.md：新增「只克隆入口规则」术语。
+
 ## [0.2.0] - 2026-09-03
 
 ### Added

@@ -1,6 +1,6 @@
 ---
 name: rule-and-excel-toolkit
-description: 解析规则批处理与 Excel 日志数据加工的执行型工具集。当用户需要处理 Base64 编码的解析规则 JSON 时触发——按 ref 父子关系生成多级层级编号、清空 normalize 中指定 field、替换顶层规则 UUID 并同步所有引用（含复制/克隆规则）、用 conditionMatch 把入口规则与子规则组装成规则链；或需要对设备/日志 Excel 做按 IP 关联汇总并拆分多 Sheet、预检日志格式与字段分布、从日志列用 JSON/键值对双格式提取多个字段、按关键词筛选日志行、按某字段去重并拆多 Sheet、按指定列去重生成汇总 Sheet 时触发。脚本通用，输入输出路径、字段名、前缀/后缀均可通过命令行参数传入。不用于官网页面生成、普通文档处理或与解析规则/日志 Excel 无关的通用编程。
+description: 解析规则批处理与 Excel 日志数据加工的执行型工具集。当用户需要处理 Base64 编码的解析规则 JSON 时触发——按 ref 父子关系生成多级层级编号、清空 normalize 中指定 field、替换顶层规则 UUID 并同步所有引用（含复制/克隆规则）、只克隆入口规则而子规则保持共享不变、用 conditionMatch 把入口规则与子规则组装成规则链；或需要对设备/日志 Excel 做按 IP 关联汇总并拆分多 Sheet、预检日志格式与字段分布、从日志列用 JSON/键值对双格式提取多个字段、按关键词筛选日志行、按某字段去重并拆多 Sheet、按指定列去重生成汇总 Sheet 时触发。脚本通用，输入输出路径、字段名、前缀/后缀均可通过命令行参数传入。不用于官网页面生成、普通文档处理或与解析规则/日志 Excel 无关的通用编程。
 ---
 
 # 解析规则与 Excel 日志加工工具集（执行型）
@@ -48,6 +48,7 @@ description: 解析规则批处理与 Excel 日志数据加工的执行型工具
 | Base64 txt（解码后是规则 JSON 数组） | 加层级编号（01_/0101_） | `rule_hierarchy_number.py` |
 | Base64 txt | 清空 normalize 中某个 field | `rule_clear_field.py` |
 | Base64 txt | 换 UUID / 复制规则（可顺带改 name） | `rule_replace_uuid.py` |
+| Base64 txt | 只克隆入口规则 N 份，子规则共享不变 | `rule_clone_entry.py` |
 | Base64 txt | 入口规则+子规则组装成规则链 | `rule_link_conditionmatch.py` |
 | .xlsx 含日志列 | 提取/去重/拆分前先预检格式与字段分布（只读） | `excel_inspect.py` |
 | .xlsx 设备清单 + 多份日志 xlsx | 按 IP 关联、汇总、拆多 Sheet | `excel_device_log_join.py` |
@@ -133,11 +134,22 @@ python scripts/rule_link_conditionmatch.py <输入.txt> [输出.txt]
 - 每个 case 的匹配条件默认固定为 `original_log like 'xxx'`，需要具体匹配值时在生成后手工替换 `'xxx'`。
 - 输出默认输入同名加 `_规则链`。跑完打印每条规则的入口/子规则标记和 conditionMatch 组装情况。
 
+### 5. rule_clone_entry.py — 只克隆入口规则（子规则共享不变）
+
+只深拷贝入口规则（`subResolver=0`）N 份，子规则一字不改、UUID 不变。每份副本：顶层 `id` 换新 UUID、顶层 `name` 加后缀、`redirect` 过滤器里每个 `case.rule.id`（内嵌 analyzer id）重生成；`case.rule.ref` 继续引用同一批子规则。与 `rule_replace_uuid.py` 的区别：那个是整批规则全部换 UUID，本脚本只动入口规则。
+
+```bash
+python scripts/rule_clone_entry.py <输入.txt> [输出.txt] [--suffixes _new1,_new2]
+```
+- `--suffixes`：逗号分隔的副本后缀，默认 `_new1,_new2`（即生成 2 份副本）。
+- 输出 = 原子规则 + 原入口规则 + 各副本（默认 14 条 = 11 子规则 + 1 原入口 + 2 副本）。
+- 输出默认输入同名加 `_入口复制`。跑完打印规则清单与引用一致性校验。
+
 ## 二、Excel 日志数据加工（pandas）
 
 依赖 `pandas` 和 `openpyxl`，执行前按上文「运行环境」确认环境（缺包可 `pip install -r requirements.txt`）。
 
-### 5. excel_device_log_join.py — 设备清单 × 多份日志按 IP 关联
+### 6. excel_device_log_join.py — 设备清单 × 多份日志按 IP 关联
 
 读取一份设备清单（默认列 `设备IP`/`设备名称`/`设备厂商`）和多份原始日志（默认列 `设备描述`/`原始保留`/`原始日志`，其中 `设备描述` 作为 IP 关联键），输出多 Sheet：`汇总`(按 IP 去重)、`全量明细`(不去重)、每个 IP 一个独立 Sheet。
 
@@ -148,7 +160,7 @@ python scripts/excel_device_log_join.py <设备清单.xlsx> <输出.xlsx> <日�
 ```
 所有列名参数都可按实际表头改。列名对不上会报错并列出可用列名，据此调整 `--*-col` 即可。
 
-### 6. excel_extract_log_fields.py — 从日志列提取多个字段（JSON/键值对双格式）
+### 7. excel_extract_log_fields.py — 从日志列提取多个字段（JSON/键值对双格式）
 
 读取 Excel 中的日志列，对每行用「JSON 解析优先 + JSON 正则兜底 + 键值对正则兜底 + 截断兜底」多策略提取指定字段，**保留原始所有列并追加提取列**（原始列不丢）。自动适配两种日志形态：JSON 体（`"field":"value"`）和管道键值对（`field="value"|||`，如 `node_ip="10.0.0.1"`）。默认提取 `deviceName`/`deviceAddress`/`deviceProductType`/`productVendorName`/`deviceSendProductName`/`rawEvent`。自动清除 Excel 不支持的控制字符；默认输出 `_diag` 诊断列。
 
@@ -162,7 +174,7 @@ python scripts/excel_extract_log_fields.py <输入.xlsx> [输出.xlsx] \
 - 输出默认输入同名加 `_提取`。
 - 诊断码含义：`OK` 正常；`EMPTY_INPUT` 日志为空；`TRUNCATED_TAIL` 源文件被 Excel 32767 字符单元格上限截断，该行提取值不完整（**源头截断，非提取错误**，精确值只能从原始日志系统重新导出）；`REGEX_MISS(x/y)` 有 y 个字段中 x 个未在日志中找到。
 
-### 7. excel_filter_logs.py — 按关键词筛选日志行
+### 8. excel_filter_logs.py — 按关键词筛选日志行
 
 读取 Excel（全部按字符串读，保留换行），筛选指定列包含指定关键词的行，输出到新 Excel。
 
@@ -173,7 +185,7 @@ python scripts/excel_filter_logs.py <输入.xlsx> [输出.xlsx] [--keyword 关�
 - `--column`：默认 `原始日志`。
 - 输出默认输入同名加 `_筛选`。跑完打印命中行数并预览前 3 条。
 
-### 8. excel_split_by_deviceaddress.py — 按指定字段去重 + 拆多 Sheet
+### 9. excel_split_by_deviceaddress.py — 按指定字段去重 + 拆多 Sheet
 
 读取 Excel，对日志列用「JSON 优先 + 正则兜底」提取指定字段，**保留原始所有列并追加提取列**。输出三类 Sheet：`原始全量数据`（全量）、`<字段>去重`（按 `--split-field` 去重保留首条）、每个不同字段值一个独立 Sheet（Sheet 名为该值）。默认按 `deviceAddress` 拆分，用 `--split-field` 可换成任意字段。自动清除 Excel 不支持的控制字符。
 
@@ -187,7 +199,7 @@ python scripts/excel_split_by_deviceaddress.py <输入.xlsx> <输出.xlsx> \
 - `--log-column`：默认 `原始日志`。
 - 跑完打印 Sheet 列表和每个字段的非空统计。
 
-### 9. excel_inspect.py — 日志预检（只读）
+### 10. excel_inspect.py — 日志预检（只读）
 
 跑提取/去重/拆分类脚本**之前**先看一眼数据：行列数、列名、Sheet 列表、日志格式识别（JSON 体 / 键值对 / 未知）、目标字段出现率与非空率、超 32767 字符的截断风险行数、空日志行数。只读不写，不产生输出文件。
 
@@ -198,7 +210,7 @@ python scripts/excel_inspect.py <输入.xlsx> [--log-column 原始日志] [--fie
 - `--sample`：格式识别抽样行数，默认 200。
 - 用途：确认格式能被提取脚本覆盖、字段名没写错、预估截断影响面，避免跑完才发现全空列。
 
-### 10. excel_dedup_sheets.py — 按指定列去重，每列一个 Sheet
+### 11. excel_dedup_sheets.py — 按指定列去重，每列一个 Sheet
 
 读取 Excel，从日志列提取指定字段（复用 `excel_extract_log_fields.py` 的全套提取策略，已存在的同名列自动跳过），**保留原始所有列并追加提取列**；然后按指定列分别去重（保留首条），输出 `全量数据` + 每个去重列一个 `<列名>去重` Sheet。与 `excel_split_by_deviceaddress.py` 的区别：那个按字段值分组、每个值一个 Sheet；本脚本按列去重只留每个值的首条，适合「看有哪些不同的事件/类型」。
 

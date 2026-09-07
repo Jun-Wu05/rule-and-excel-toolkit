@@ -31,6 +31,7 @@ dsh plugin --profile web add github:Jun-Wu05/rule-and-excel-toolkit
 | `rule_clear_field.py` | 置空 / 删除 normalize 中的 field |
 | `rule_replace_uuid.py` | 替换顶层规则 UUID + 加 name 前缀/后缀（可 `--verify`） |
 | `rule_link_conditionmatch.py` | 入口规则 + 子规则组装成规则链 |
+| `rule_clone_entry.py` | 只克隆入口规则 N 份，子规则共享不变 |
 | `excel_inspect.py` | 日志预检（只读）：格式识别、字段出现率、截断风险 |
 | `excel_device_log_join.py` | 设备清单 × 多份日志按 IP 关联、汇总、拆 Sheet |
 | `excel_extract_log_fields.py` | 从日志列提取多个字段（JSON/键值对双格式 + 截断兜底 + `--verify-sample`） |
