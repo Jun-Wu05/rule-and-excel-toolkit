@@ -7,26 +7,57 @@ description: 解析规则批处理与 Excel 日志数据加工的执行型工具
 
 ## 1. Skill 定位
 
-这是一个**执行型 Skill**。触发后应优先调用 `scripts/` 下已有脚本完成任务，并返回最终结果文件，而不是只给用户脚本、伪代码或手工操作说明。
+这是一个**执行型 Skill**。触发后应优先调用 `scripts/` 下已有能力完成任务，并返回最终结果文件，而不是只给用户脚本、伪代码或手工操作说明。
 
 核心原则：
 
 - **单 Skill、多能力域**：解析规则与 Excel 日志处理统一由本 Skill 管理。
 - **宿主无关**：不绑定 DSH、Claude、Codex、GPT、OpenClaw、Hermes 或其他具体 Agent。
+- **统一入口优先**：跨 Agent 调用优先使用 `scripts/toolkit.py`，独立脚本保留为兼容入口和业务实现层。
 - **优先复用**：已有脚本能完成时，不重新实现同类逻辑。
 - **参数适配优先**：字段名、前后缀、输出路径等差异优先通过 CLI 参数解决。
-- **执行后验证**：任务完成前必须读取脚本日志或验证结果，确认输出可信。
+- **执行后验证**：任务完成前必须读取统一结果或脚本验证结果，确认输出可信。
 - **保护原始数据**：除非用户明确要求，不覆盖原始输入文件。
 
 跨 Agent 兼容说明见 `references/platform-compatibility.md`。
 
+### 统一 CLI（优先）
+
+跨 Agent 调用时，**优先使用 `scripts/toolkit.py` 作为稳定公共入口**；下方独立脚本继续保留为兼容入口和业务实现层。不要让宿主依赖各脚本不同的自然语言 stdout 判断结果。
+
+```bash
+python scripts/toolkit.py <rule|excel> <command> --input <path> [--output <path>] [业务参数...]
+```
+
+- Agent 推荐 `--format json`，读取带 `schema_version` 的结构化结果。
+- 需要先确认调用计划时使用 `--dry-run`，不会执行脚本或写文件。
+- 支持验证的命令使用 `--verify`。
+- 新增正式能力必须注册到 `scripts/common/registry.py`，并遵循 `references/cli-contract.md`。
+- 只有旧调用兼容、排障或直接开发业务脚本时，才直接调用具体 `scripts/*.py`。
+
+当前统一命令：
+
+| 能力 | 统一 CLI command |
+|---|---|
+| 规则层级编号 | `rule hierarchy` |
+| 清空/删除 normalize field | `rule clear-field` |
+| 替换 UUID | `rule reuuid` |
+| 克隆入口规则 | `rule clone-entry` |
+| 组装规则链 | `rule link` |
+| Excel 预检 | `excel inspect` |
+| Excel 字段提取 | `excel extract` |
+| Excel 关键词筛选 | `excel filter` |
+| Excel 按字段拆 Sheet | `excel split` |
+| Excel 按列去重 | `excel dedup` |
+| 设备日志 IP 关联 | `excel join` |
+
 ## 2. 标准执行流程
 
 1. 识别输入类型：Base64 解析规则，或 Excel 文件。
-2. 识别用户意图，并从下方选型表选择最匹配脚本。
-3. Excel 的提取、去重、拆分类任务先执行 `excel_inspect.py` 预检。
-4. 使用当前 Agent 可用的命令执行能力运行 Python 脚本。
-5. 读取脚本输出日志，检查行数、规则数、字段命中、UUID/引用、Sheet 数、诊断码等。
+2. 识别用户意图，并从下方选型表选择对应能力；优先映射到统一 CLI command。
+3. Excel 的提取、去重、拆分类任务先执行 `excel inspect` 预检；旧入口等价于 `excel_inspect.py`。
+4. 使用当前 Agent 可用的命令执行能力，优先通过 `scripts/toolkit.py` 运行对应命令；旧脚本 CLI 仅作为兼容入口。
+5. 优先读取 `--format json` 的结构化结果；旧入口则读取脚本日志，检查行数、规则数、字段命中、UUID/引用、Sheet 数、诊断码等。
 6. 能使用 `--verify`、`--verify-sample` 或等效诊断时应优先使用。
 7. 验证通过后返回最终文件路径，并简要说明处理内容与验证结论。
 
@@ -83,23 +114,25 @@ python -c "import sys, pandas, openpyxl; print(sys.executable)"
 
 ## 5. 输入识别与脚本选型
 
-| 输入 | 用户需求 | 脚本 |
-|---|---|---|
-| Base64 txt | 加层级编号 | `rule_hierarchy_number.py` |
-| Base64 txt | 清空/删除 normalize field | `rule_clear_field.py` |
-| Base64 txt | 换 UUID / 复制整批规则 / 改 name | `rule_replace_uuid.py` |
-| Base64 txt | 只克隆入口规则 N 份，子规则共享 | `rule_clone_entry.py` |
-| Base64 txt | 入口规则 + 子规则组装规则链 | `rule_link_conditionmatch.py` |
-| .xlsx | 提取/去重/拆分前预检 | `excel_inspect.py` |
-| 设备清单 + 日志 xlsx | 按 IP 关联汇总 | `excel_device_log_join.py` |
-| .xlsx 含日志列 | 提取多个字段 | `excel_extract_log_fields.py` |
-| .xlsx 含日志列 | 关键词筛选 | `excel_filter_logs.py` |
-| .xlsx 含日志列 | 按字段值拆多个 Sheet | `excel_split_by_deviceaddress.py` |
-| .xlsx 含日志列 | 按指定列分别去重 | `excel_dedup_sheets.py` |
+| 输入 | 用户需求 | 统一命令 | 独立脚本兼容入口 |
+|---|---|---|---|
+| Base64 txt | 加层级编号 | `rule hierarchy` | `rule_hierarchy_number.py` |
+| Base64 txt | 清空/删除 normalize field | `rule clear-field` | `rule_clear_field.py` |
+| Base64 txt | 换 UUID / 复制整批规则 / 改 name | `rule reuuid` | `rule_replace_uuid.py` |
+| Base64 txt | 只克隆入口规则 N 份，子规则共享 | `rule clone-entry` | `rule_clone_entry.py` |
+| Base64 txt | 入口规则 + 子规则组装规则链 | `rule link` | `rule_link_conditionmatch.py` |
+| .xlsx | 提取/去重/拆分前预检 | `excel inspect` | `excel_inspect.py` |
+| 设备清单 + 日志 xlsx | 按 IP 关联汇总 | `excel join` | `excel_device_log_join.py` |
+| .xlsx 含日志列 | 提取多个字段 | `excel extract` | `excel_extract_log_fields.py` |
+| .xlsx 含日志列 | 关键词筛选 | `excel filter` | `excel_filter_logs.py` |
+| .xlsx 含日志列 | 按字段值拆多个 Sheet | `excel split` | `excel_split_by_deviceaddress.py` |
+| .xlsx 含日志列 | 按指定列分别去重 | `excel dedup` | `excel_dedup_sheets.py` |
 
 不确定输入类型时，先检查文件或解码内容。Base64 解码后若为 JSON 数组，且元素包含 `id`、`name`、`normalize`、`parser` 等解析规则结构，则按解析规则处理。
 
 ## 6. 解析规则类脚本
+
+以下独立脚本说明保留用于兼容、排障和业务实现理解；跨 Agent 正常执行优先使用统一 CLI。
 
 ### 6.1 `rule_hierarchy_number.py`
 
@@ -165,6 +198,8 @@ python scripts/rule_link_conditionmatch.py <输入.txt> [输出.txt]
 当前脚本默认生成 `original_log like 'xxx'` 占位条件。若用户已提供具体匹配值，不应把 `'xxx'` 当作最终交付；应明确剩余手工项，或在脚本能力支持后传入真实条件。
 
 ## 7. Excel 类脚本
+
+以下独立脚本说明同样作为兼容入口；统一 CLI 会负责公共参数、JSON 输出和退出码。
 
 ### 7.1 `excel_inspect.py`
 
@@ -240,10 +275,10 @@ python scripts/excel_dedup_sheets.py <输入.xlsx> <输出.xlsx> \
 
 | 用户表达 | 实际含义 | 处理方式 |
 |---|---|---|
-| 加前缀 / 加后缀 | 只改顶层 name | `rule_replace_uuid.py --prefix-only` |
-| 加层级编号 / 01_ / 0101_ | 按 ref 生成编号 | `rule_hierarchy_number.py` |
-| 换 UUID / 重新出规则 ID / 复制整批规则 | 顶层 UUID 全换并同步引用 | `rule_replace_uuid.py` |
-| 只复制入口规则 | 子规则共享不变 | `rule_clone_entry.py` |
+| 加前缀 / 加后缀 | 只改顶层 name | `rule reuuid --prefix-only` |
+| 加层级编号 / 01_ / 0101_ | 按 ref 生成编号 | `rule hierarchy` |
+| 换 UUID / 重新出规则 ID / 复制整批规则 | 顶层 UUID 全换并同步引用 | `rule reuuid` |
+| 只复制入口规则 | 子规则共享不变 | `rule clone-entry` |
 
 缺少真正阻塞执行的关键参数时只问一次；能通过预检、脚本默认值或现有文件结构推断的，不重复询问。
 
@@ -286,11 +321,24 @@ new_unknown_refs = unknown_refs_after - unknown_refs_before
 - 已有脚本能完成的任务，禁止临时重写一份同功能实现。
 - 列名不匹配时优先通过 CLI 参数调整，不修改源码。
 - 新需求优先扩展现有脚本参数或公共解析策略。
+- 新增正式能力时必须同步注册到 `scripts/common/registry.py`，让统一 CLI、JSON 输出和 CI contract 自动覆盖该能力。
 - 禁止通过复制脚本形成 `_new`、`_v2`、`_final`、客户名后缀等长期变体。
-- 只有现有脚本架构明显无法容纳的新能力，才新增独立脚本，并同步更新 SKILL.md、README/文档和 CHANGELOG。
+- 只有现有脚本架构明显无法容纳的新能力，才新增独立脚本，并同步更新 registry、SKILL.md、README/文档和 CHANGELOG。
 - 若必须临时应急实现，应明确告知用户它不是标准能力，后续应收敛回正式脚本。
 
 ## 11. 输出要求
+
+统一 CLI 模式下优先读取结构化结果：
+
+- `status`
+- `command`
+- `input`
+- `output`
+- `stats`
+- `verification`
+- `warnings`
+- `error`
+- `schema_version`
 
 任务完成后至少告诉用户：
 
