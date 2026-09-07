@@ -2,6 +2,21 @@
 
 本项目显著变更的记录，按 [Keep a Changelog](https://keepachangelog.com/zh-CN/) 风格维护，版本号遵循 [SemVer](https://semver.org/lang/zh-CN/)。
 
+## [0.5.0] - 2026-09-07
+
+### Added
+- 新增统一入口 `scripts/toolkit.py`，以 `rule <command>` / `excel <command>` 方式统一调用现有 11 个业务脚本。
+- 新增 `scripts/common/` 公共 CLI 基础设施：命令注册、统一 Result、human/json 输出、稳定退出码。
+- 新增 `references/cli-contract.md`，定义公共参数、JSON schema、退出码与新增命令注册规则。
+- 新增 repo 级 `tests/test_cli_contract.py`，检查 11 个命令注册、脚本存在性、输出后缀、参数唯一性、统一 help 与 JSON dry-run schema。
+- 统一 CLI 支持 `--format human|json`；JSON 输出带 `schema_version: 1.0`。
+- 支持 `--dry-run`，可在不执行旧脚本、不写输出文件的情况下检查最终调用计划。
+
+### Changed
+- 现有独立脚本继续保留为兼容入口；跨 Agent 集成优先使用 `toolkit.py`，避免依赖各脚本不同的参数和自然语言 stdout。
+- `package.json` 版本同步到 `0.5.0`，项目描述改为跨 Agent Skill，同时保留 DSH provider bundle 兼容。
+- CI 新增 Python 3.11 和 CLI contract tests；`verify.mjs` 同时校验统一 CLI 必需文件和 package/CHANGELOG 版本一致性。
+
 ## [0.4.0] - 2026-09-07
 
 ### Added
