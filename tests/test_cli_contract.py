@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import importlib.util
 import json
 import subprocess
 import sys
@@ -12,6 +11,7 @@ SCRIPTS = ROOT / "skills" / "rule-and-excel-toolkit" / "scripts"
 TOOLKIT = SCRIPTS / "toolkit.py"
 
 sys.path.insert(0, str(SCRIPTS))
+from common.log_fields import extract_fields
 from common.registry import COMMANDS
 
 
@@ -40,6 +40,28 @@ class CliContractTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("rule", result.stdout)
         self.assertIn("excel", result.stdout)
+
+    def test_split_help_exposes_selective_output_options(self):
+        result = subprocess.run(
+            [sys.executable, str(TOOLKIT), "excel", "split", "--help"],
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("--keep-columns", result.stdout)
+        self.assertIn("--no-full-sheet", result.stdout)
+
+    def test_plain_kv_and_raw_data_tail_extraction(self):
+        log = (
+            "x=1;dev_ip=10.104.11.19;raw_data=<46>Sep 04 host: "
+            "dev_ip=10.104.11.19;agent_id=abc;msg=hello world"
+        )
+        got = extract_fields(log, ["raw_data", "dev_ip"])
+        self.assertEqual(got["dev_ip"], "10.104.11.19")
+        self.assertEqual(
+            got["raw_data"],
+            "<46>Sep 04 host: dev_ip=10.104.11.19;agent_id=abc;msg=hello world",
+        )
 
     def test_json_dry_run_schema(self):
         result = subprocess.run([
