@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import subprocess
 import sys
@@ -94,6 +95,22 @@ def _legacy_verification(spec: CommandSpec, args: argparse.Namespace, stdout: st
     return VerificationResult(status="not_run")
 
 
+def _parse_standard_stats(stdout: str) -> dict:
+    stats: dict = {}
+    for line in stdout.splitlines():
+        if not line.startswith("[STATS] ") or "=" not in line:
+            continue
+        key, raw = line[len("[STATS] "):].split("=", 1)
+        key = key.strip().lower()
+        raw = raw.strip()
+        try:
+            value = json.loads(raw)
+        except Exception:
+            value = raw
+        stats[key] = value
+    return stats
+
+
 def _inspect_output(spec: CommandSpec, args: argparse.Namespace, output_path: str | None) -> tuple[dict, VerificationResult]:
     if not output_path:
         return {}, VerificationResult(status="not_run")
@@ -111,6 +128,20 @@ def _inspect_output(spec: CommandSpec, args: argparse.Namespace, output_path: st
     if not requested:
         return stats, VerificationResult(status="not_run", details={"checks": checks})
     return stats, VerificationResult(status="pass" if checks_pass(checks) else "fail", details={"source": "output-inspection", "checks": checks})
+
+
+def _combine_verification(legacy: VerificationResult, structured: VerificationResult, requested: bool) -> VerificationResult:
+    details = {
+        "legacy": {"status": legacy.status, **legacy.details},
+        "structured": {"status": structured.status, **structured.details},
+    }
+    if legacy.status == "fail" or structured.status == "fail":
+        return VerificationResult(status="fail", details=details)
+    if requested:
+        if structured.status == "pass" or legacy.status == "pass":
+            return VerificationResult(status="pass", details=details)
+        return VerificationResult(status="fail", details={**details, "reason": "verification requested but no check ran"})
+    return VerificationResult(status="not_run", details=details)
 
 
 def run_command(spec: CommandSpec, args: argparse.Namespace) -> tuple[CommandResult, int]:
@@ -137,16 +168,20 @@ def run_command(spec: CommandSpec, args: argparse.Namespace) -> tuple[CommandRes
     stderr = completed.stderr or ""
     warnings = [line.strip() for line in stdout.splitlines() if "[WARN]" in line or "⚠" in line]
 
-    structured_stats: dict = {"legacy_returncode": completed.returncode}
-    verification = _legacy_verification(spec, args, stdout + "\n" + stderr, completed.returncode)
+    stats: dict = {"legacy_returncode": completed.returncode}
+    stats.update(_parse_standard_stats(stdout))
+    legacy_verification = _legacy_verification(spec, args, stdout + "\n" + stderr, completed.returncode)
+    structured_verification = VerificationResult(status="not_run")
 
     if completed.returncode == 0 and spec.supports_output:
-        inspected_stats, inspected_verification = _inspect_output(spec, args, output_path)
-        structured_stats.update(inspected_stats)
-        if inspected_verification.status != "not_run" or getattr(args, "verify", False):
-            verification = inspected_verification
-        elif inspected_verification.details:
-            verification.details.update(inspected_verification.details)
+        inspected_stats, structured_verification = _inspect_output(spec, args, output_path)
+        stats.update(inspected_stats)
+
+    verification = _combine_verification(
+        legacy_verification,
+        structured_verification,
+        requested=getattr(args, "verify", False),
+    )
 
     status = "success" if completed.returncode == 0 and verification.status != "fail" else "error"
     error = None if status == "success" else (stderr.strip() or "command failed or verification did not pass")
@@ -155,7 +190,7 @@ def run_command(spec: CommandSpec, args: argparse.Namespace) -> tuple[CommandRes
         command=spec.command_id,
         input=args.input,
         output=output_path,
-        stats=structured_stats,
+        stats=stats,
         verification=verification,
         warnings=warnings,
         error=error,
