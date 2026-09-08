@@ -35,6 +35,11 @@ class CliContractTests(unittest.TestCase):
             flags = [o.flag for o in spec.options]
             self.assertEqual(len(flags), len(set(flags)), spec.command_id)
 
+    def test_output_commands_support_structured_verify(self):
+        for spec in COMMANDS:
+            if spec.supports_output:
+                self.assertTrue(spec.supports_verify, spec.command_id)
+
     def test_toolkit_help(self):
         result = subprocess.run([sys.executable, str(TOOLKIT), "--help"], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -49,17 +54,21 @@ class CliContractTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("--keep-columns", result.stdout)
+        self.assertIn("--tail-fields", result.stdout)
         self.assertIn("--no-full-sheet", result.stdout)
 
-    def test_plain_kv_and_raw_data_tail_extraction(self):
+    def test_plain_kv_tail_extraction_is_configurable(self):
         log = (
             "x=1;dev_ip=10.104.11.19;raw_data=<46>Sep 04 host: "
             "dev_ip=10.104.11.19;agent_id=abc;msg=hello world"
         )
-        got = extract_fields(log, ["raw_data", "dev_ip"])
-        self.assertEqual(got["dev_ip"], "10.104.11.19")
+        scalar = extract_fields(log, ["raw_data", "dev_ip"])
+        self.assertEqual(scalar["raw_data"], "<46>Sep 04 host: dev_ip=10.104.11.19")
+
+        tail = extract_fields(log, ["raw_data", "dev_ip"], tail_fields={"raw_data"})
+        self.assertEqual(tail["dev_ip"], "10.104.11.19")
         self.assertEqual(
-            got["raw_data"],
+            tail["raw_data"],
             "<46>Sep 04 host: dev_ip=10.104.11.19;agent_id=abc;msg=hello world",
         )
 
