@@ -2,10 +2,11 @@
 # -*- coding: utf-8 -*-
 """按指定字段拆 Sheet 的日志加工脚本。
 
-默认只保留日志列，再追加提取字段，写“原始全量数据”+ 去重页 + 每值全量页。
+默认只保留日志列，且提取字段在前、源列在后（日志列在最后一列），
+写“原始全量数据”+ 去重页 + 每值全量页。
 可选：
-- --keep-columns: 仅保留指定源列，再追加提取字段；
-- --keep-all-columns: 保留全部源列（恢复旧默认行为）；
+- --keep-columns: 仅保留指定源列（提取字段在前，保留的源列在后）；
+- --keep-all-columns: 保留全部源列（恢复旧默认行为，提取字段仍在前）；
 - --no-full-sheet: 不写“原始全量数据”Sheet；
 - --tail-fields: 指定 plain KV 中需要一直取到日志末尾的字段，默认 raw_data；
 - 支持 JSON、带引号 KV、不带引号 KV。
@@ -94,7 +95,7 @@ def process(
         base_df = df[keep_columns].copy()
 
     base_df = base_df.drop(columns=[c for c in target_fields if c in base_df.columns], errors="ignore")
-    out = pd.concat([base_df, field_df[target_fields]], axis=1)
+    out = pd.concat([field_df[target_fields], base_df], axis=1)
     out = _clean_frame(out)
 
     if split_field not in out.columns:

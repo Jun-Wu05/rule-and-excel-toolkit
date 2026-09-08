@@ -183,9 +183,7 @@ class CliE2ETests(unittest.TestCase):
         self.assert_output_exists(p)
         wb = load_workbook(p["output"], read_only=True)
         header = [c.value for c in next(wb["deviceAddress去重"].iter_rows(min_row=1, max_row=1))]
-        self.assertIn("原始日志", header)
-        self.assertIn("deviceAddress", header)
-        self.assertNotIn("其他列", header)
+        self.assertEqual(header, ["deviceName", "deviceAddress", "name", "原始日志"])
         wb.close()
 
     def test_excel_split_keep_all_columns(self):
@@ -200,8 +198,7 @@ class CliE2ETests(unittest.TestCase):
         self.assert_output_exists(p)
         wb = load_workbook(p["output"], read_only=True)
         header = [c.value for c in next(wb["deviceAddress去重"].iter_rows(min_row=1, max_row=1))]
-        self.assertIn("原始日志", header)
-        self.assertIn("其他列", header)
+        self.assertEqual(header, ["deviceName", "deviceAddress", "name", "原始日志", "其他列"])
         wb.close()
 
     def test_excel_dedup(self):

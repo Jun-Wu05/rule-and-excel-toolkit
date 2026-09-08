@@ -257,7 +257,7 @@ python scripts/excel_split_by_deviceaddress.py <输入.xlsx> <输出.xlsx> \
   [--keep-columns 列1,列2] [--keep-all-columns] [--no-full-sheet]
 ```
 
-默认 `--split-field deviceAddress`，也可指定其他已存在或已提取字段。默认只保留日志列，再追加提取字段；需要保留全部源列时加 `--keep-all-columns`，或按需用 `--keep-columns` 指定保留列。
+默认 `--split-field deviceAddress`，也可指定其他已存在或已提取字段。默认只保留日志列，提取字段在前、日志列放在最后一列；需要保留全部源列时加 `--keep-all-columns`（提取字段仍在前），或按需用 `--keep-columns` 指定保留列。
 
 ### 7.6 `excel_dedup_sheets.py`
 

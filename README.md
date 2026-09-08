@@ -40,9 +40,9 @@ python scripts/toolkit.py excel extract --input input.xlsx --fields deviceName,d
 
 `--format json` 输出带稳定 `schema_version`；`--dry-run` 可检查最终调用计划但不运行脚本、不写输出。所有产生输出文件的统一命令支持 `--verify`，验证会直接检查真实输出文件；规则类会检查新增未知引用和顶层 ID 唯一性，Excel 类会检查输出工作簿可读性、Sheet、行数和列结构。完整 CLI 契约见 `skills/rule-and-excel-toolkit/references/cli-contract.md`。
 
-`excel split` 还支持：
+`excel split` 还支持（提取字段在前，源列在后，日志列默认放最后一列）：
 
-- `--keep-columns`：仅保留指定源列，再追加提取字段（默认只保留日志列）；
+- `--keep-columns`：仅保留指定源列（默认只保留日志列）；
 - `--keep-all-columns`：保留全部源列，覆盖默认的只保留日志列；
 - `--no-full-sheet`：不生成原始全量 Sheet；
 - `--tail-fields`：配置 plain KV 中需要一直提取到日志末尾的字段，例如 `raw_data`。
