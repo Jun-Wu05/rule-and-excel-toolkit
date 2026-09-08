@@ -15,6 +15,7 @@ from common import exit_codes
 from common.output import emit_result
 from common.registry import CommandSpec, get_command, iter_commands
 from common.result import CommandResult, VerificationResult
+from common.result_inspection import checks_pass, inspect_excel, inspect_rule_transition
 
 
 def _dest(flag: str) -> str:
@@ -82,22 +83,34 @@ def build_legacy_argv(spec: CommandSpec, args: argparse.Namespace, output_path: 
     return cmd
 
 
-def infer_verification(spec: CommandSpec, args: argparse.Namespace, stdout: str, returncode: int) -> VerificationResult:
+def _legacy_verification(spec: CommandSpec, args: argparse.Namespace, stdout: str, returncode: int) -> VerificationResult:
     if returncode != 0:
         return VerificationResult(status="fail", details={"returncode": returncode})
-    if spec.command_id == "rule.clone-entry":
-        if "全部通过" in stdout:
-            return VerificationResult(status="pass", details={"source": "intrinsic"})
-        if "有异常" in stdout:
-            return VerificationResult(status="fail", details={"source": "intrinsic"})
     if spec.command_id == "excel.extract" and (getattr(args, "verify", False) or getattr(args, "verify_sample", 0) > 0):
         if "抽查存在不一致" in stdout or "不一致的" in stdout:
             return VerificationResult(status="fail", details={"source": "verify-sample"})
         if "抽查回对" in stdout:
             return VerificationResult(status="pass", details={"source": "verify-sample"})
-    if getattr(args, "verify", False):
-        return VerificationResult(status="pass", details={"source": "legacy-command", "returncode": 0})
     return VerificationResult(status="not_run")
+
+
+def _inspect_output(spec: CommandSpec, args: argparse.Namespace, output_path: str | None) -> tuple[dict, VerificationResult]:
+    if not output_path:
+        return {}, VerificationResult(status="not_run")
+    try:
+        if spec.domain == "rule":
+            stats, checks = inspect_rule_transition(args.input, output_path)
+        elif spec.domain == "excel":
+            stats, checks = inspect_excel(args.input, output_path)
+        else:
+            return {}, VerificationResult(status="not_run")
+    except Exception as exc:
+        return {}, VerificationResult(status="fail", details={"output_inspection_error": str(exc)})
+
+    requested = getattr(args, "verify", False)
+    if not requested:
+        return stats, VerificationResult(status="not_run", details={"checks": checks})
+    return stats, VerificationResult(status="pass" if checks_pass(checks) else "fail", details={"source": "output-inspection", "checks": checks})
 
 
 def run_command(spec: CommandSpec, args: argparse.Namespace) -> tuple[CommandResult, int]:
@@ -122,20 +135,27 @@ def run_command(spec: CommandSpec, args: argparse.Namespace) -> tuple[CommandRes
 
     stdout = completed.stdout or ""
     stderr = completed.stderr or ""
-    verification = infer_verification(spec, args, stdout + "\n" + stderr, completed.returncode)
-    warnings = []
-    for line in stdout.splitlines():
-        if "[WARN]" in line or "⚠" in line:
-            warnings.append(line.strip())
+    warnings = [line.strip() for line in stdout.splitlines() if "[WARN]" in line or "⚠" in line]
+
+    structured_stats: dict = {"legacy_returncode": completed.returncode}
+    verification = _legacy_verification(spec, args, stdout + "\n" + stderr, completed.returncode)
+
+    if completed.returncode == 0 and spec.supports_output:
+        inspected_stats, inspected_verification = _inspect_output(spec, args, output_path)
+        structured_stats.update(inspected_stats)
+        if inspected_verification.status != "not_run" or getattr(args, "verify", False):
+            verification = inspected_verification
+        elif inspected_verification.details:
+            verification.details.update(inspected_verification.details)
 
     status = "success" if completed.returncode == 0 and verification.status != "fail" else "error"
-    error = None if status == "success" else (stderr.strip() or "legacy command failed or verification did not pass")
+    error = None if status == "success" else (stderr.strip() or "command failed or verification did not pass")
     result = CommandResult(
         status=status,
         command=spec.command_id,
         input=args.input,
         output=output_path,
-        stats={"returncode": completed.returncode},
+        stats=structured_stats,
         verification=verification,
         warnings=warnings,
         error=error,
