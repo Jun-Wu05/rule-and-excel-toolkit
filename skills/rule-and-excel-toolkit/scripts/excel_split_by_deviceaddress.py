@@ -33,6 +33,19 @@ def clean_for_excel(value):
     return value
 
 
+def _clean_frame(frame):
+    """Apply scalar cleanup across pandas versions.
+
+    DataFrame.applymap was removed in pandas 3.0; DataFrame.map is available in
+    newer pandas. Keep a fallback so existing pandas 1.x/2.x environments still
+    work.
+    """
+    mapper = getattr(frame, "map", None)
+    if callable(mapper):
+        return mapper(clean_for_excel)
+    return frame.applymap(clean_for_excel)
+
+
 def safe_sheet_name(name, used):
     base = str(name) if name is not None and str(name) != "" else "空"
     base = re.sub(r'[\:\\/?*\[\]]', '_', base).strip()[:31]
@@ -78,7 +91,7 @@ def process(
 
     base_df = base_df.drop(columns=[c for c in target_fields if c in base_df.columns], errors="ignore")
     out = pd.concat([base_df, field_df[target_fields]], axis=1)
-    out = out.applymap(clean_for_excel)
+    out = _clean_frame(out)
 
     if split_field not in out.columns:
         raise ValueError(f"未找到拆分字段 '{split_field}'，可用列: {list(out.columns)}")
