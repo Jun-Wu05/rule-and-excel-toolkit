@@ -253,10 +253,11 @@ python scripts/excel_filter_logs.py <输入.xlsx> [输出.xlsx] [--keyword 关�
 
 ```bash
 python scripts/excel_split_by_deviceaddress.py <输入.xlsx> <输出.xlsx> \
-  [--log-column 原始日志] [--fields f1,f2,...] [--split-field 字段]
+  [--log-column 原始日志] [--fields f1,f2,...] [--split-field 字段] \
+  [--keep-columns 列1,列2] [--keep-all-columns] [--no-full-sheet]
 ```
 
-默认 `--split-field deviceAddress`，也可指定其他已存在或已提取字段。
+默认 `--split-field deviceAddress`，也可指定其他已存在或已提取字段。默认只保留日志列，再追加提取字段；需要保留全部源列时加 `--keep-all-columns`，或按需用 `--keep-columns` 指定保留列。
 
 ### 7.6 `excel_dedup_sheets.py`
 

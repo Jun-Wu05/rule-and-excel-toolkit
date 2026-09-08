@@ -54,6 +54,7 @@ class CliContractTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("--keep-columns", result.stdout)
+        self.assertIn("--keep-all-columns", result.stdout)
         self.assertIn("--tail-fields", result.stdout)
         self.assertIn("--no-full-sheet", result.stdout)
 

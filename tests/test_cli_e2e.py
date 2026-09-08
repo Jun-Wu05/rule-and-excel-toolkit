@@ -170,6 +170,39 @@ class CliE2ETests(unittest.TestCase):
         self.assertEqual(p["verification"]["status"], "pass")
         wb = load_workbook(p["output"], read_only=True)
         self.assertIn("deviceAddress去重", wb.sheetnames)
+        wb.close()
+
+    def test_excel_split_default_keeps_only_log_column(self):
+        p = self.run_cli(
+            "excel", "split", "--input", str(self.log),
+            "--fields", "deviceName,deviceAddress,name",
+            "--split-field", "deviceAddress",
+            "--no-full-sheet",
+            "--verify",
+        )
+        self.assert_output_exists(p)
+        wb = load_workbook(p["output"], read_only=True)
+        header = [c.value for c in next(wb["deviceAddress去重"].iter_rows(min_row=1, max_row=1))]
+        self.assertIn("原始日志", header)
+        self.assertIn("deviceAddress", header)
+        self.assertNotIn("其他列", header)
+        wb.close()
+
+    def test_excel_split_keep_all_columns(self):
+        p = self.run_cli(
+            "excel", "split", "--input", str(self.log),
+            "--fields", "deviceName,deviceAddress,name",
+            "--split-field", "deviceAddress",
+            "--keep-all-columns",
+            "--no-full-sheet",
+            "--verify",
+        )
+        self.assert_output_exists(p)
+        wb = load_workbook(p["output"], read_only=True)
+        header = [c.value for c in next(wb["deviceAddress去重"].iter_rows(min_row=1, max_row=1))]
+        self.assertIn("原始日志", header)
+        self.assertIn("其他列", header)
+        wb.close()
 
     def test_excel_dedup(self):
         p = self.run_cli("excel", "dedup", "--input", str(self.log), "--fields", "log_msg", "--dedup-cols", "log_msg", "--verify")

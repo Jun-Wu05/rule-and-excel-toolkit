@@ -2,9 +2,10 @@
 # -*- coding: utf-8 -*-
 """按指定字段拆 Sheet 的日志加工脚本。
 
-默认保持旧行为：保留全部源列，写“原始全量数据”+ 去重页 + 每值全量页。
-新增：
+默认只保留日志列，再追加提取字段，写“原始全量数据”+ 去重页 + 每值全量页。
+可选：
 - --keep-columns: 仅保留指定源列，再追加提取字段；
+- --keep-all-columns: 保留全部源列（恢复旧默认行为）；
 - --no-full-sheet: 不写“原始全量数据”Sheet；
 - --tail-fields: 指定 plain KV 中需要一直取到日志末尾的字段，默认 raw_data；
 - 支持 JSON、带引号 KV、不带引号 KV。
@@ -70,6 +71,7 @@ def process(
     target_fields,
     split_field="deviceAddress",
     keep_columns=None,
+    keep_all=False,
     include_full_sheet=True,
     tail_fields=None,
 ):
@@ -81,8 +83,10 @@ def process(
     extracted = df[log_column].apply(lambda s: extract_fields(s, target_fields, tail_fields=tail_fields))
     field_df = pd.DataFrame(extracted.tolist(), index=df.index)
 
-    if keep_columns is None:
+    if keep_all:
         base_df = df.copy()
+    elif keep_columns is None:
+        base_df = df[[log_column]].copy()
     else:
         missing = [c for c in keep_columns if c not in df.columns]
         if missing:
@@ -140,7 +144,8 @@ def main():
     p.add_argument("--log-column", default="原始日志")
     p.add_argument("--fields", default="deviceName,productVendorName,deviceSendProductName,dvcAddress,rawEvent,deviceAddress,dataType")
     p.add_argument("--split-field", default="deviceAddress")
-    p.add_argument("--keep-columns", default=None, help="仅保留这些源列，逗号分隔；不传则保留全部源列")
+    p.add_argument("--keep-columns", default=None, help="仅保留这些源列，逗号分隔；不传则默认只保留日志列")
+    p.add_argument("--keep-all-columns", action="store_true", help="保留全部源列（覆盖默认的只保留日志列）")
     p.add_argument("--tail-fields", default="raw_data", help="plain KV 中取到日志末尾的字段，逗号分隔；默认 raw_data")
     p.add_argument("--no-full-sheet", action="store_true", help="不输出原始全量数据 Sheet")
     a = p.parse_args(sys.argv[1:])
@@ -152,6 +157,7 @@ def main():
         _parse_csv(a.fields),
         a.split_field,
         keep_columns=None if a.keep_columns is None else _parse_csv(a.keep_columns),
+        keep_all=a.keep_all_columns,
         include_full_sheet=not a.no_full_sheet,
         tail_fields=_parse_csv(a.tail_fields),
     )

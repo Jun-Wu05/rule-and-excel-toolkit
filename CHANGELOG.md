@@ -2,6 +2,15 @@
 
 本项目显著变更的记录，按 [Keep a Changelog](https://keepachangelog.com/zh-CN/) 风格维护，版本号遵循 [SemVer](https://semver.org/lang/zh-CN/)。
 
+## [0.6.0] - 2026-09-08
+
+### Added
+- `excel split` 新增 `--keep-all-columns`：显式保留全部源列，用于恢复「保留全部源列」的旧默认行为。
+
+### Changed
+- `excel_split_by_deviceaddress.py` 默认行为由「保留全部源列」改为「只保留日志列，再追加提取字段」；需要保留其他源列时用 `--keep-columns` 指定，需要保留全部源列时用 `--keep-all-columns`。
+- `package.json` 版本同步到 `0.6.0`。
+
 ## [0.5.0] - 2026-09-07
 
 ### Added

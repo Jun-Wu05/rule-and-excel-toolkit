@@ -42,7 +42,8 @@ python scripts/toolkit.py excel extract --input input.xlsx --fields deviceName,d
 
 `excel split` 还支持：
 
-- `--keep-columns`：仅保留指定源列，再追加提取字段；
+- `--keep-columns`：仅保留指定源列，再追加提取字段（默认只保留日志列）；
+- `--keep-all-columns`：保留全部源列，覆盖默认的只保留日志列；
 - `--no-full-sheet`：不生成原始全量 Sheet；
 - `--tail-fields`：配置 plain KV 中需要一直提取到日志末尾的字段，例如 `raw_data`。
 
