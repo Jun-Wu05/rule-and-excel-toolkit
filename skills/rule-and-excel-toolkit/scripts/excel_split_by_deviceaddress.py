@@ -6,11 +6,11 @@
 新增：
 - --keep-columns: 仅保留指定源列，再追加提取字段；
 - --no-full-sheet: 不写“原始全量数据”Sheet；
-- 支持 JSON、带引号 KV、不带引号 KV；raw_data 作为尾部字段完整提取。
+- --tail-fields: 指定 plain KV 中需要一直取到日志末尾的字段，默认 raw_data；
+- 支持 JSON、带引号 KV、不带引号 KV。
 """
 
 import argparse
-import os
 import re
 import sys
 from pathlib import Path
@@ -58,13 +58,14 @@ def process(
     split_field="deviceAddress",
     keep_columns=None,
     include_full_sheet=True,
+    tail_fields=None,
 ):
     print(f"[INFO] INPUT={input_path}")
     df = pd.read_excel(input_path, dtype=object)
     if log_column not in df.columns:
         raise ValueError(f"未找到列 '{log_column}'，可用列: {list(df.columns)}")
 
-    extracted = df[log_column].apply(lambda s: extract_fields(s, target_fields))
+    extracted = df[log_column].apply(lambda s: extract_fields(s, target_fields, tail_fields=tail_fields))
     field_df = pd.DataFrame(extracted.tolist(), index=df.index)
 
     if keep_columns is None:
@@ -75,7 +76,6 @@ def process(
             raise ValueError(f"--keep-columns 包含不存在的源列: {missing}")
         base_df = df[keep_columns].copy()
 
-    # Avoid duplicate extracted columns if a source column has the same name.
     base_df = base_df.drop(columns=[c for c in target_fields if c in base_df.columns], errors="ignore")
     out = pd.concat([base_df, field_df[target_fields]], axis=1)
     out = out.applymap(clean_for_excel)
@@ -128,6 +128,7 @@ def main():
     p.add_argument("--fields", default="deviceName,productVendorName,deviceSendProductName,dvcAddress,rawEvent,deviceAddress,dataType")
     p.add_argument("--split-field", default="deviceAddress")
     p.add_argument("--keep-columns", default=None, help="仅保留这些源列，逗号分隔；不传则保留全部源列")
+    p.add_argument("--tail-fields", default="raw_data", help="plain KV 中取到日志末尾的字段，逗号分隔；默认 raw_data")
     p.add_argument("--no-full-sheet", action="store_true", help="不输出原始全量数据 Sheet")
     a = p.parse_args(sys.argv[1:])
 
@@ -139,6 +140,7 @@ def main():
         a.split_field,
         keep_columns=None if a.keep_columns is None else _parse_csv(a.keep_columns),
         include_full_sheet=not a.no_full_sheet,
+        tail_fields=_parse_csv(a.tail_fields),
     )
 
 
