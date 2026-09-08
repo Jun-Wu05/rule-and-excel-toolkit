@@ -15,7 +15,7 @@ Agent 加载 `skills/rule-and-excel-toolkit/SKILL.md` 后，推荐优先通过�
 python scripts/toolkit.py <rule|excel> <command> --input <path> [--output <path>] [业务参数...]
 ```
 
-Agent 推荐使用机器输出：
+Agent 推荐使用机器输出与结构化验证：
 
 ```sh
 python scripts/toolkit.py rule reuuid --input input.txt --format json --verify
@@ -38,7 +38,13 @@ python scripts/toolkit.py excel extract --input input.xlsx --fields deviceName,d
 | Excel 按列去重 | `excel dedup` |
 | 设备日志 IP 关联 | `excel join` |
 
-`--format json` 输出带稳定 `schema_version`；`--dry-run` 可检查最终调用计划但不运行脚本、不写输出。完整 CLI 契约见 `skills/rule-and-excel-toolkit/references/cli-contract.md`。
+`--format json` 输出带稳定 `schema_version`；`--dry-run` 可检查最终调用计划但不运行脚本、不写输出。所有产生输出文件的统一命令支持 `--verify`，验证会直接检查真实输出文件；规则类会检查新增未知引用和顶层 ID 唯一性，Excel 类会检查输出工作簿可读性、Sheet、行数和列结构。完整 CLI 契约见 `skills/rule-and-excel-toolkit/references/cli-contract.md`。
+
+`excel split` 还支持：
+
+- `--keep-columns`：仅保留指定源列，再追加提取字段；
+- `--no-full-sheet`：不生成原始全量 Sheet；
+- `--tail-fields`：配置 plain KV 中需要一直提取到日志末尾的字段，例如 `raw_data`。
 
 ## DSH 使用示例
 
@@ -80,17 +86,20 @@ python -c "import sys, pandas, openpyxl; print(sys.executable)"
 
 ## 验证与兼容性
 
-- 统一 CLI 的 human/json 输出由公共结果层生成，Agent 不需要解析独立脚本的 emoji 或自然语言日志。
+- 统一 CLI 的 human/json 输出由公共结果层生成，Agent 不需要解析独立脚本的 emoji 或自然语言日志来判断核心结果。
+- 规则验证会比较处理前后未知引用集合，要求 `new_unknown_refs = unknown_after - unknown_before` 为空。
+- Excel 验证会直接打开输出文件并返回 Sheet 名、行数、列名等结构化统计。
+- 旧脚本内建验证与统一层验证并列执行，任一失败则总体验证失败。
 - 现有独立脚本旧调用方式继续可用；迁移阶段不做破坏性删除。
-- CI 会检查命令注册、脚本存在性、默认输出规范、JSON schema、package/CHANGELOG 版本一致性。
-- 新增正式脚本必须在 `common/registry.py` 注册，否则不应视为完成统一 CLI 接入。
+- CI 安装 `requirements.txt` 后真实执行全部 11 个统一 CLI 命令，不只检查 `--help` / `--dry-run`。
+- 新增正式脚本必须在 `common/registry.py` 注册，并增加至少一个真实 E2E，否则不应视为完成统一 CLI 接入。
 
 ## 迭代
 
 - Skill 核心位于 `skills/rule-and-excel-toolkit/`。
-- 新能力优先复用现有脚本；正式新增能力需同步 registry、SKILL.md、README/相关文档和 CHANGELOG。
+- 新能力优先复用现有脚本；正式新增能力需同步 registry、E2E、SKILL.md、README/相关文档和 CHANGELOG。
 - 不长期保留 `_new`、`_v2`、`_final`、客户名后缀等复制型变体脚本。
-- push 后 CI 会执行 Node bundle 校验和 Python CLI contract tests。
+- push 后 CI 会执行 Node bundle 校验和 Python CLI contract/E2E tests。
 
 ## 许可证
 
