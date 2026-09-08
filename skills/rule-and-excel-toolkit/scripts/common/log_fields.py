@@ -11,13 +11,14 @@ def _unescape(raw: str) -> str:
         return raw
 
 
-def extract_fields(log_str, target_fields):
+def extract_fields(log_str, target_fields, tail_fields=None):
     """Extract fields from JSON, quoted KV and plain KV logs.
 
-    Plain scalar KV uses ``field=value`` up to the next semicolon. ``raw_data``
-    is treated as a tail field because this log family embeds a nested event
-    containing its own semicolon-delimited KV payload.
+    ``tail_fields`` marks fields whose plain ``field=value`` form consumes the
+    rest of the record. This is useful for nested payload fields such as
+    ``raw_data`` without hard-coding business-specific field names here.
     """
+    tail_fields = set(tail_fields or ())
     result = {field: "" for field in target_fields}
     if not isinstance(log_str, str) or not log_str.strip():
         return result
@@ -46,7 +47,7 @@ def extract_fields(log_str, target_fields):
             result[field] = _unescape(quoted.group(1))
             continue
 
-        if field == "raw_data":
+        if field in tail_fields:
             plain = re.search(rf'(?<![A-Za-z0-9_]){escaped}=(.*)$', log_str, re.S)
         else:
             plain = re.search(rf'(?<![A-Za-z0-9_]){escaped}=([^;\r\n]*)', log_str)
