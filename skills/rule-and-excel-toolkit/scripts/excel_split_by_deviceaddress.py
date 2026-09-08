@@ -1,22 +1,28 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-按指定字段拆 Sheet 的日志加工脚本（执行型）
-- 从 原始日志 列解析 JSON，提取指定字段；
-- 保留原始所有列，并追加提取字段列；
-- 首页：原始全量数据；
-- 第二页：按 --split-field 去重（保留首条，默认 deviceAddress）；
-- 之后每个不同字段值一个独立 Sheet，Sheet 名为该值。
+"""按指定字段拆 Sheet 的日志加工脚本。
+
+默认保持旧行为：保留全部源列，写“原始全量数据”+ 去重页 + 每值全量页。
+新增：
+- --keep-columns: 仅保留指定源列，再追加提取字段；
+- --no-full-sheet: 不写“原始全量数据”Sheet；
+- 支持 JSON、带引号 KV、不带引号 KV；raw_data 作为尾部字段完整提取。
 """
 
 import argparse
-import json
 import os
 import re
 import sys
+from pathlib import Path
 
 import pandas as pd
 from openpyxl import Workbook
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from common.log_fields import extract_fields
 
 _ILLEGAL_CHARS_RE = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f]')
 
@@ -28,12 +34,8 @@ def clean_for_excel(value):
 
 
 def safe_sheet_name(name, used):
-    """生成合法且不重复的 sheet 名（Excel 限制 31 字符，禁用 : \\ / ? * [ ]）"""
     base = str(name) if name is not None and str(name) != "" else "空"
-    base = re.sub(r'[\:\\/?*\[\]]', '_', base)
-    base = base.strip()
-    if len(base) > 31:
-        base = base[:31]
+    base = re.sub(r'[\:\\/?*\[\]]', '_', base).strip()[:31]
     candidate = base
     i = 2
     while candidate in used:
@@ -44,58 +46,50 @@ def safe_sheet_name(name, used):
     return candidate
 
 
-def extract_one(log_str, target_fields):
-    """JSON 优先 + 正则兜底，返回 (字段字典, 是否成功)"""
-    result = {f: "" for f in target_fields}
-    if not isinstance(log_str, str) or not log_str.strip():
-        return result, False
-    # 策略1：JSON
-    try:
-        start = log_str.find('{')
-        end = log_str.rfind('}') + 1
-        if start != -1 and end > start:
-            data = json.loads(log_str[start:end])
-            infos = data.get("parsedInfos", data)
-            for f in target_fields:
-                v = infos.get(f, "")
-                result[f] = str(v) if v is not None else ""
-            return result, True
-    except json.JSONDecodeError:
-        pass
-    # 策略2：正则兜底
-    for f in target_fields:
-        m = re.search(rf'"{f}"\s*:\s*"((?:[^"\\]|\\.)*)"', log_str)
-        if m:
-            raw = m.group(1)
-            try:
-                result[f] = json.loads(f'"{raw}"')
-            except Exception:
-                result[f] = raw
-    return result, True
+def _parse_csv(raw):
+    return [x.strip() for x in (raw or "").split(",") if x.strip()]
 
 
-def process(input_path, output_path, log_column, target_fields, split_field="deviceAddress"):
-    print(f"📂 读取: {input_path}")
+def process(
+    input_path,
+    output_path,
+    log_column,
+    target_fields,
+    split_field="deviceAddress",
+    keep_columns=None,
+    include_full_sheet=True,
+):
+    print(f"[INFO] INPUT={input_path}")
     df = pd.read_excel(input_path, dtype=object)
     if log_column not in df.columns:
-        raise ValueError(f"❌ 未找到列 '{log_column}'，可用列: {list(df.columns)}")
-    print(f"🔍 共 {len(df)} 行，提取字段 {target_fields}")
+        raise ValueError(f"未找到列 '{log_column}'，可用列: {list(df.columns)}")
 
-    extracted = df[log_column].apply(lambda s: extract_one(s, target_fields))
-    field_df = pd.DataFrame([r for r, _ in extracted], index=df.index)
+    extracted = df[log_column].apply(lambda s: extract_fields(s, target_fields))
+    field_df = pd.DataFrame(extracted.tolist(), index=df.index)
 
-    # 保留所有原始列 + 追加提取列
-    out = pd.concat([df, field_df[target_fields]], axis=1)
+    if keep_columns is None:
+        base_df = df.copy()
+    else:
+        missing = [c for c in keep_columns if c not in df.columns]
+        if missing:
+            raise ValueError(f"--keep-columns 包含不存在的源列: {missing}")
+        base_df = df[keep_columns].copy()
+
+    # Avoid duplicate extracted columns if a source column has the same name.
+    base_df = base_df.drop(columns=[c for c in target_fields if c in base_df.columns], errors="ignore")
+    out = pd.concat([base_df, field_df[target_fields]], axis=1)
     out = out.applymap(clean_for_excel)
 
     if split_field not in out.columns:
-        raise ValueError(f"❌ 未找到拆分字段 '{split_field}'，可用列: {list(out.columns)}")
+        raise ValueError(f"未找到拆分字段 '{split_field}'，可用列: {list(out.columns)}")
 
-    # 去重页（按 split_field 保留首条）
     dedup = out.drop_duplicates(subset=[split_field], keep="first").reset_index(drop=True)
+    distinct = [v for v in dict.fromkeys(out[split_field].fillna("").astype(str).tolist()) if v]
 
-    distinct = list(dict.fromkeys(out[split_field].astype(str).tolist()))
-    print(f"   全量 {len(out)} 行；去重后 {len(dedup)} 行；不同 {split_field} 共 {len(distinct)} 个")
+    print(f"[STATS] INPUT_ROWS={len(df)}")
+    print(f"[STATS] OUTPUT_COLUMNS={list(out.columns)}")
+    print(f"[STATS] DEDUP_ROWS={len(dedup)}")
+    print(f"[STATS] UNIQUE_{split_field}={len(distinct)}")
 
     wb = Workbook()
     wb.remove(wb.active)
@@ -106,40 +100,46 @@ def process(input_path, output_path, log_column, target_fields, split_field="dev
         ws = wb.create_sheet(title=sn)
         ws.append(list(frame.columns))
         for row in frame.itertuples(index=False, name=None):
-            ws.append([("" if (v is None or (isinstance(v, float) and pd.isna(v))) else v) for v in row])
-        # 简单列宽
+            ws.append(["" if (v is None or (isinstance(v, float) and pd.isna(v))) else v for v in row])
         for i, col in enumerate(frame.columns, 1):
-            ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = max(12, min(60, max(len(str(col)), 14)))
+            ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = max(12, min(60, len(str(col)) + 4))
         return sn
 
-    # 首页：原始全量
-    write_sheet("原始全量数据", out)
-    # 第二页：按 split_field 去重
+    if include_full_sheet:
+        write_sheet("原始全量数据", out)
     write_sheet(f"{split_field}去重", dedup)
-    # 之后：每个字段值一个 sheet
-    for addr in distinct:
-        sub = out[out[split_field].astype(str) == addr].reset_index(drop=True)
-        write_sheet(addr, sub)
+    for value in distinct:
+        sub = out[out[split_field].fillna("").astype(str) == value].reset_index(drop=True)
+        write_sheet(value, sub)
 
     wb.save(output_path)
-    print(f"✅ 完成! 输出: {output_path}")
-    print(f"   Sheet 列表({len(wb.sheetnames)}): {wb.sheetnames}")
-    # 字段非空统计
-    for f in target_fields:
-        non_empty = (out[f].astype(str) != "").sum()
-        print(f"   - {f}: {non_empty}/{len(out)} 条有值")
+    print(f"[OUTPUT] PATH={output_path}")
+    print(f"[STATS] SHEETS={len(wb.sheetnames)}")
+    for field in target_fields:
+        non_empty = int((out[field].fillna("").astype(str) != "").sum())
+        print(f"[STATS] FIELD_{field}_NONEMPTY={non_empty}")
 
 
 def main():
-    p = argparse.ArgumentParser()
+    p = argparse.ArgumentParser(description="提取日志字段并按指定字段拆多 Sheet")
     p.add_argument("input")
     p.add_argument("output")
     p.add_argument("--log-column", default="原始日志")
     p.add_argument("--fields", default="deviceName,productVendorName,deviceSendProductName,dvcAddress,rawEvent,deviceAddress,dataType")
-    p.add_argument("--split-field", default="deviceAddress", help="按该列去重并拆 Sheet（默认 deviceAddress）")
+    p.add_argument("--split-field", default="deviceAddress")
+    p.add_argument("--keep-columns", default=None, help="仅保留这些源列，逗号分隔；不传则保留全部源列")
+    p.add_argument("--no-full-sheet", action="store_true", help="不输出原始全量数据 Sheet")
     a = p.parse_args(sys.argv[1:])
-    fields = [f.strip() for f in a.fields.split(",") if f.strip()]
-    process(a.input, a.output, a.log_column, fields, a.split_field)
+
+    process(
+        a.input,
+        a.output,
+        a.log_column,
+        _parse_csv(a.fields),
+        a.split_field,
+        keep_columns=None if a.keep_columns is None else _parse_csv(a.keep_columns),
+        include_full_sheet=not a.no_full_sheet,
+    )
 
 
 if __name__ == "__main__":
