@@ -7,74 +7,99 @@
 
 ## 使用
 
-直接说明要处理的任务即可。Agent 加载 `skills/rule-and-excel-toolkit/SKILL.md` 后，应优先使用 `scripts/` 下已有脚本处理输入文件、验证结果，并返回最终输出文件。
+Agent 加载 `skills/rule-and-excel-toolkit/SKILL.md` 后，推荐优先通过统一入口 `scripts/toolkit.py` 执行任务。现有 11 个独立脚本继续保留，作为兼容入口和业务实现层。
 
-示例：
+统一命令形态：
 
-- 「帮我把这个 Base64 规则文件加层级编号，前缀用浦发银行_」
-- 「把这份设备清单和这几份日志按 IP 汇总、拆 Sheet」
-- 「从这份日志 Excel 的原始日志列提取 deviceName/deviceAddress」
-- 「只复制入口规则两份，子规则保持共享」
+```sh
+python scripts/toolkit.py <rule|excel> <command> --input <path> [--output <path>] [业务参数...]
+```
 
-具体触发规则、脚本选择、执行边界和验证标准见 `skills/rule-and-excel-toolkit/SKILL.md`。
+Agent 推荐使用机器输出与结构化验证：
+
+```sh
+python scripts/toolkit.py rule reuuid --input input.txt --format json --verify
+python scripts/toolkit.py excel extract --input input.xlsx --fields deviceName,deviceAddress --format json --verify
+```
+
+统一 CLI 当前命令：
+
+| 需求 | 命令 |
+|---|---|
+| 规则层级编号 | `rule hierarchy` |
+| 清空/删除 normalize field | `rule clear-field` |
+| 替换 UUID | `rule reuuid` |
+| 克隆入口规则 | `rule clone-entry` |
+| 组装规则链 | `rule link` |
+| Excel 预检 | `excel inspect` |
+| Excel 字段提取 | `excel extract` |
+| Excel 关键词筛选 | `excel filter` |
+| Excel 按字段拆 Sheet | `excel split` |
+| Excel 按列去重 | `excel dedup` |
+| 设备日志 IP 关联 | `excel join` |
+
+`--format json` 输出带稳定 `schema_version`；`--dry-run` 可检查最终调用计划但不运行脚本、不写输出。所有产生输出文件的统一命令支持 `--verify`，验证会直接检查真实输出文件；规则类会检查新增未知引用和顶层 ID 唯一性，Excel 类会检查输出工作簿可读性、Sheet、行数和列结构。完整 CLI 契约见 `skills/rule-and-excel-toolkit/references/cli-contract.md`。
+
+`excel split` 还支持：
+
+- `--keep-columns`：仅保留指定源列，再追加提取字段；
+- `--no-full-sheet`：不生成原始全量 Sheet；
+- `--tail-fields`：配置 plain KV 中需要一直提取到日志末尾的字段，例如 `raw_data`。
 
 ## DSH 使用示例
 
-本仓库仍兼容 DSH。需要通过 DSH 安装时，可使用：
+本仓库仍兼容 DSH：
 
 ```sh
 dsh plugin --profile web add github:Jun-Wu05/rule-and-excel-toolkit
 ```
 
-安装后重启对应 profile。DSH 只是当前兼容宿主之一，不是本 Skill 的强制运行环境。
+DSH 是兼容宿主之一，不是 Skill 的强制运行环境。
 
-## 脚本一览
+## 独立脚本兼容入口
 
 | 脚本 | 作用 |
 |---|---|
 | `rule_hierarchy_number.py` | 按 ref 还原层级，给规则 name 加多级编号前缀 |
 | `rule_clear_field.py` | 置空 / 删除 normalize 中的 field |
-| `rule_replace_uuid.py` | 替换顶层规则 UUID + 同步引用，可改 name（支持 `--verify` / `--prefix-only`） |
+| `rule_replace_uuid.py` | 替换顶层规则 UUID + 同步引用，可改 name |
 | `rule_clone_entry.py` | 只克隆入口规则 N 份，子规则共享不变 |
 | `rule_link_conditionmatch.py` | 入口规则 + 子规则组装成 conditionMatch 规则链 |
-| `excel_inspect.py` | 日志预检（只读）：格式识别、字段出现率、截断风险 |
-| `excel_device_log_join.py` | 设备清单 × 多份日志按 IP 关联、汇总、拆 Sheet |
-| `excel_extract_log_fields.py` | 从日志列提取多个字段（JSON/键值对双格式 + 诊断 + `--verify-sample`） |
+| `excel_inspect.py` | 日志预检 |
+| `excel_device_log_join.py` | 设备清单 × 多份日志按 IP 关联 |
+| `excel_extract_log_fields.py` | 从日志列提取多个字段 |
 | `excel_filter_logs.py` | 按关键词筛选日志行 |
-| `excel_split_by_deviceaddress.py` | 按指定字段值去重并拆多 Sheet，默认 `deviceAddress` |
-| `excel_dedup_sheets.py` | 按指定列去重保留首条，每列一个 Sheet |
+| `excel_split_by_deviceaddress.py` | 按指定字段值去重并拆多 Sheet |
+| `excel_dedup_sheets.py` | 按指定列去重保留首条 |
 
 ## 运行环境
 
 - 解析规则类脚本只依赖 Python 标准库。
 - Excel 类脚本需要 `pandas` + `openpyxl`，依赖见 [requirements.txt](requirements.txt)。
-- 推荐先探测当前 Python 是否可用：
+- 推荐先探测当前 Python：
 
 ```sh
 python -c "import sys, pandas, openpyxl; print(sys.executable)"
 ```
 
-- 当前环境不可用时，可探测已有 conda/venv 环境。
-- 宿主若支持环境缓存，可复用已验证的 Python；不支持时重新探测即可。
-- 未经用户明确同意，不自动创建虚拟环境或安装依赖。
+未经用户明确同意，不自动创建虚拟环境或安装依赖。跨 Agent 兼容原则见 `skills/rule-and-excel-toolkit/references/platform-compatibility.md`。
 
-跨 Agent 兼容原则见 `skills/rule-and-excel-toolkit/references/platform-compatibility.md`。
+## 验证与兼容性
 
-## 验证原则
-
-Skill 不是“脚本能跑完就算成功”。
-
-- 解析规则任务应检查规则数量、UUID 替换、name 改写、引用关系，以及处理前后未知引用集合；不得产生新的未知 UUID 引用。
-- Excel 任务应根据场景检查行数、字段非空率、Sheet/唯一值数量、诊断码、抽查回对结果和截断风险。
-- `TRUNCATED_TAIL` 表示存在疑似截断风险，不能仅凭当前 xlsx 断言缺失内容一定可恢复或一定不可恢复。
+- 统一 CLI 的 human/json 输出由公共结果层生成，Agent 不需要解析独立脚本的 emoji 或自然语言日志来判断核心结果。
+- 规则验证会比较处理前后未知引用集合，要求 `new_unknown_refs = unknown_after - unknown_before` 为空。
+- Excel 验证会直接打开输出文件并返回 Sheet 名、行数、列名等结构化统计。
+- 旧脚本内建验证与统一层验证并列执行，任一失败则总体验证失败。
+- 现有独立脚本旧调用方式继续可用；迁移阶段不做破坏性删除。
+- CI 安装 `requirements.txt` 后真实执行全部 11 个统一 CLI 命令，不只检查 `--help` / `--dry-run`。
+- 新增正式脚本必须在 `common/registry.py` 注册，并增加至少一个真实 E2E，否则不应视为完成统一 CLI 接入。
 
 ## 迭代
 
 - Skill 核心位于 `skills/rule-and-excel-toolkit/`。
-- 业务逻辑优先通过现有脚本和 CLI 参数扩展，不长期保留 `_new`、`_v2`、`_final`、客户名后缀等复制型变体脚本。
-- 新增正式能力时同步更新 `SKILL.md`、README/相关文档和 [CHANGELOG.md](CHANGELOG.md)。
-- push 后 CI 会执行 `node verify.mjs` 校验包结构。
-- 设计决策与领域术语分别记录在 [docs/adr/](docs/adr/) 与 [CONTEXT.md](CONTEXT.md)。
+- 新能力优先复用现有脚本；正式新增能力需同步 registry、E2E、SKILL.md、README/相关文档和 CHANGELOG。
+- 不长期保留 `_new`、`_v2`、`_final`、客户名后缀等复制型变体脚本。
+- push 后 CI 会执行 Node bundle 校验和 Python CLI contract/E2E tests。
 
 ## 许可证
 

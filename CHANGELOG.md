@@ -2,6 +2,28 @@
 
 本项目显著变更的记录，按 [Keep a Changelog](https://keepachangelog.com/zh-CN/) 风格维护，版本号遵循 [SemVer](https://semver.org/lang/zh-CN/)。
 
+## [0.5.0] - 2026-09-07
+
+### Added
+- 新增统一入口 `scripts/toolkit.py`，以 `rule <command>` / `excel <command>` 方式统一调用现有 11 个业务脚本。
+- 新增 `scripts/common/` 公共 CLI 基础设施：命令注册、统一 Result、human/json 输出、稳定退出码。
+- 新增 `references/cli-contract.md`，定义公共参数、JSON schema、退出码与新增命令注册规则。
+- 新增 repo 级 `tests/test_cli_contract.py`，检查命令注册、脚本存在性、输出后缀、参数唯一性、统一 help、JSON dry-run schema 与 parser 配置契约。
+- 新增 `tests/test_cli_e2e.py`，在 CI 动态生成 Base64 规则与 Excel fixture，真实执行全部 11 个统一 CLI 命令。
+- 新增结构化输出检查：规则类直接校验 Base64/JSON、顶层 ID 唯一性及处理前后未知引用差集；Excel 类直接读取输出工作簿统计 Sheet、行数与列名。
+- 统一 CLI 支持 `--format human|json`；JSON 输出带 `schema_version: 1.0`。
+- 支持 `--dry-run`，可在不执行旧脚本、不写输出文件的情况下检查最终调用计划。
+- `excel split` 新增 `--keep-columns`、`--no-full-sheet`、`--tail-fields`，支持选择保留源列、控制全量 Sheet 与配置 plain KV 尾字段。
+
+### Changed
+- 现有独立脚本继续保留为兼容入口；跨 Agent 集成优先使用 `toolkit.py`，避免依赖各脚本不同的参数和自然语言 stdout。
+- 所有产生输出文件的统一命令开放结构化 `--verify`；旧脚本专属验证与统一输出验证并列执行，任一失败则总体验证失败。
+- JSON `stats` 优先合并标准 `[STATS]` 与真实输出文件检查结果，降低 Agent 对 `legacy_stdout` 的依赖。
+- 公共日志字段解析器不再硬编码 `raw_data` 为尾字段，改由 `tail_fields` 显式配置。
+- `excel_split_by_deviceaddress.py` 兼容 pandas 3.0 移除 `DataFrame.applymap()` 的变化，同时保留旧版 pandas 回退路径。
+- `package.json` 版本同步到 `0.5.0`，项目描述改为跨 Agent Skill，同时保留 DSH provider bundle 兼容。
+- CI 新增 Python 3.11、安装 `requirements.txt`，并运行 Node bundle 校验、CLI contract tests 与 11 命令 E2E。
+
 ## [0.4.0] - 2026-09-07
 
 ### Added
