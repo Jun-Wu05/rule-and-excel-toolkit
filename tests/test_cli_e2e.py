@@ -122,6 +122,19 @@ class CliE2ETests(unittest.TestCase):
         self.assert_output_exists(p)
         self.assertEqual(p["verification"]["status"], "pass")
 
+    def test_rule_hierarchy_root_code(self):
+        p = self.run_cli(
+            "rule", "hierarchy", "--input", str(self.rule),
+            "--prefix", "T_", "--root-code", "0101", "--verify",
+        )
+        self.assert_output_exists(p)
+        self.assertEqual(p["verification"]["status"], "pass")
+        raw = Path(p["output"]).read_text(encoding="utf-8")
+        clean = "".join(raw.split())
+        rules = json.loads(base64.b64decode(clean))
+        names = sorted(r["name"] for r in rules)
+        self.assertEqual(names, ["0101_T_入口规则", "010101_T_子规则"])
+
     def test_rule_clear_field(self):
         p = self.run_cli("rule", "clear-field", "--input", str(self.rule), "--fields", "location_country", "--verify")
         self.assert_output_exists(p)

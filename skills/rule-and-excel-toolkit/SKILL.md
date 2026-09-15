@@ -142,10 +142,11 @@ python -c "import sys, pandas, openpyxl; print(sys.executable)"
 按递归 `ref` 关系还原层级，为 name 加多级编号，例如 `01_`、`0101_`，深度不限；自动清洗旧编号与旧前缀，避免重复叠加。
 
 ```bash
-python scripts/rule_hierarchy_number.py <输入.txt> [输出.txt] [--prefix 前缀]
+python scripts/rule_hierarchy_number.py <输入.txt> [输出.txt] [--prefix 前缀] [--root-code 0101]
 ```
 
 - `--prefix ""`：只加数字编号，不加业务前缀。
+- `--root-code 0101`：指定根节点编号；不传则按 `01`、`02`… 依次编号。
 - 输出默认加 `_层级编号` 后缀。
 
 ### 6.2 `rule_clear_field.py`

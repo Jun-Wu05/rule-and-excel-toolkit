@@ -31,7 +31,7 @@ class CommandSpec:
 
 O = OptionSpec
 COMMANDS: tuple[CommandSpec, ...] = (
-    CommandSpec("rule", "hierarchy", "rule_hierarchy_number.py", "按 ref 生成层级编号", supports_verify=True, output_suffix="_层级编号", options=(O("--prefix", kwargs={"default": None}),)),
+    CommandSpec("rule", "hierarchy", "rule_hierarchy_number.py", "按 ref 生成层级编号", supports_verify=True, output_suffix="_层级编号", options=(O("--prefix", kwargs={"default": None}), O("--root-code", kwargs={"default": None}))),
     CommandSpec("rule", "clear-field", "rule_clear_field.py", "置空/删除 normalize.field", supports_verify=True, output_suffix="_字段处理", options=(O("--fields", kwargs={"required": True}), O("--mode", kwargs={"choices": ("clear", "remove"), "default": "clear"}))),
     CommandSpec("rule", "reuuid", "rule_replace_uuid.py", "替换顶层 UUID 并同步引用", supports_verify=True, output_suffix="_reuuid", options=(O("--prefix", kwargs={"default": ""}), O("--suffix", kwargs={"default": ""}), O("--prefix-only", kwargs={"action": "store_true"}))),
     CommandSpec("rule", "clone-entry", "rule_clone_entry.py", "只克隆入口规则", supports_verify=True, output_suffix="_入口复制", options=(O("--suffixes", kwargs={"default": "_new1,_new2"}),)),

@@ -6,6 +6,7 @@
 
 ### Added
 - 新增 `rule_clone_rule.py` 与统一命令 `rule clone-rule`：按顶层 `id` 精确选中一条规则（通常为自包含子规则），按 `--count N` 复制 N 份独立副本；每份换新 UUID、name 加 `_copy1`…`_copyN`（`--suffix` 可改前缀），入口规则与其他规则原样不动、副本不接线。区别于 `rule clone-entry`（克隆入口规则、子规则共享）与 `rule reuuid`（整批 1:1 换 ID、不增数量）。
+- `rule hierarchy` 新增 `--root-code`：指定根节点编号（如 `0101`），不传则按 `01`、`02`… 依次编号。
 
 ### Changed
 - `common/registry.py` 登记 `rule clone-rule`（命令总数 11 → 12）。

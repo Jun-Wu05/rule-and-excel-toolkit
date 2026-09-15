@@ -96,11 +96,12 @@ def build_hierarchy_by_ref(data_array: list) -> tuple:
     return children_map, root_indices, id_to_idx
 
 
-def generate_numbered_names(data_array: list, children_map: dict, root_indices: list, name_prefix: str = None) -> dict:
+def generate_numbered_names(data_array: list, children_map: dict, root_indices: list, name_prefix: str = None, root_code: str = None) -> dict:
     """
     基于ref构建的准确层级树生成编号（支持任意深度）
     所有层级均加编号，不再跳过任何深度
     name_prefix: 名称前缀，默认用模块级 NAME_PREFIX
+    root_code: 根节点编号（如 0101）；不传则按 01、02… 依次编号
     """
     if name_prefix is None:
         name_prefix = NAME_PREFIX
@@ -128,8 +129,8 @@ def generate_numbered_names(data_array: list, children_map: dict, root_indices: 
 
     # 从每个根节点开始遍历
     for root_seq, root_idx in enumerate(sorted(root_indices), start=1):
-        root_code = f"{root_seq:02d}"
-        traverse(root_idx, root_code, 1)
+        base_code = root_code if root_code is not None else f"{root_seq:02d}"
+        traverse(root_idx, base_code, 1)
 
     # 兜底：未被遍历到的孤立节点
     assigned = set(name_map.keys())
@@ -152,6 +153,7 @@ def parse_args(argv):
     p.add_argument("input", nargs="?", default=INPUT_FILE, help="输入文件（Base64），默认 input.txt")
     p.add_argument("output", nargs="?", default=None, help="输出文件，默认输入同名加 _层级编号")
     p.add_argument("--prefix", default=None, help="名称前缀，如 浦发银行_；不传则用脚本内置默认，传空字符串则不加前缀")
+    p.add_argument("--root-code", default=None, help="根节点编号，如 0101；不传则按 01、02… 依次编号")
     return p.parse_args(argv)
 
 
@@ -188,8 +190,8 @@ def main():
     children_map, root_indices, _ = build_hierarchy_by_ref(data_array)
 
     # 生成编号
-    print(f"[INFO] 正在生成层级编号 (前缀='{name_prefix}')...")
-    name_map = generate_numbered_names(data_array, children_map, root_indices, name_prefix=name_prefix)
+    print(f"[INFO] 正在生成层级编号 (前缀='{name_prefix}', 根编号='{args.root_code or '默认(01)'}')...")
+    name_map = generate_numbered_names(data_array, children_map, root_indices, name_prefix=name_prefix, root_code=args.root_code)
 
     # 应用编号并打印结果
     for idx in sorted(name_map.keys()):
