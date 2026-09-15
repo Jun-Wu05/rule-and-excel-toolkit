@@ -8,3 +8,7 @@ __pycache__/
 # 依赖 / 构建产物
 node_modules/
 .DS_Store
+
+# 临时脚本与样例数据
+tmp/
+浦发银行_windows_安全日志_入口规则备份数据_层级编号.txt
