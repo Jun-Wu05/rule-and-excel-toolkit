@@ -138,6 +138,27 @@ class CliE2ETests(unittest.TestCase):
         self.assert_output_exists(p)
         self.assertEqual(p["verification"]["status"], "pass")
 
+    def test_rule_clone_rule(self):
+        child_id = "11111111-1111-4111-8111-111111111111"
+        p = self.run_cli(
+            "rule", "clone-rule", "--input", str(self.rule),
+            "--rule-id", child_id, "--count", "3", "--verify",
+        )
+        self.assert_output_exists(p)
+        self.assertEqual(p["verification"]["status"], "pass")
+        self.assertEqual(p["stats"]["output_rule_count"], 5)
+        self.assertEqual(p["stats"]["new_unknown_refs"], 0)
+
+        raw = Path(p["output"]).read_text(encoding="utf-8")
+        clean = "".join(raw.split())
+        rules = json.loads(base64.b64decode(clean))
+        names = [r["name"] for r in rules]
+        ids = [r["id"] for r in rules]
+        for i in range(1, 4):
+            self.assertIn(f"子规则_copy{i}", names)
+        self.assertEqual(len(ids), len(set(ids)))
+        self.assertNotIn(child_id, [r["id"] for r in rules if r["name"].startswith("子规则_copy")])
+
     def test_rule_link(self):
         p = self.run_cli("rule", "link", "--input", str(self.rule), "--verify")
         self.assert_output_exists(p)

@@ -2,6 +2,16 @@
 
 本项目显著变更的记录，按 [Keep a Changelog](https://keepachangelog.com/zh-CN/) 风格维护，版本号遵循 [SemVer](https://semver.org/lang/zh-CN/)。
 
+## [Unreleased]
+
+### Added
+- 新增 `rule_clone_rule.py` 与统一命令 `rule clone-rule`：按顶层 `id` 精确选中一条规则（通常为自包含子规则），按 `--count N` 复制 N 份独立副本；每份换新 UUID、name 加 `_copy1`…`_copyN`（`--suffix` 可改前缀），入口规则与其他规则原样不动、副本不接线。区别于 `rule clone-entry`（克隆入口规则、子规则共享）与 `rule reuuid`（整批 1:1 换 ID、不增数量）。
+
+### Changed
+- `common/registry.py` 登记 `rule clone-rule`（命令总数 11 → 12）。
+- `tests/test_cli_contract.py` 命令数断言同步为 12；`tests/test_cli_e2e.py` 新增 `test_rule_clone_rule` 真实 E2E。
+- SKILL.md、README.md 同步命令表、触发范围、选型表与新旧脚本差异说明。
+
 ## [0.6.0] - 2026-09-08
 
 ### Added

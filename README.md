@@ -7,7 +7,7 @@
 
 ## 使用
 
-Agent 加载 `skills/rule-and-excel-toolkit/SKILL.md` 后，推荐优先通过统一入口 `scripts/toolkit.py` 执行任务。现有 11 个独立脚本继续保留，作为兼容入口和业务实现层。
+Agent 加载 `skills/rule-and-excel-toolkit/SKILL.md` 后，推荐优先通过统一入口 `scripts/toolkit.py` 执行任务。现有 12 个独立脚本继续保留，作为兼容入口和业务实现层。
 
 统一命令形态：
 
@@ -30,6 +30,7 @@ python scripts/toolkit.py excel extract --input input.xlsx --fields deviceName,d
 | 清空/删除 normalize field | `rule clear-field` |
 | 替换 UUID | `rule reuuid` |
 | 克隆入口规则 | `rule clone-entry` |
+| 克隆指定子规则 N 份 | `rule clone-rule` |
 | 组装规则链 | `rule link` |
 | Excel 预检 | `excel inspect` |
 | Excel 字段提取 | `excel extract` |
@@ -65,6 +66,7 @@ DSH 是兼容宿主之一，不是 Skill 的强制运行环境。
 | `rule_clear_field.py` | 置空 / 删除 normalize 中的 field |
 | `rule_replace_uuid.py` | 替换顶层规则 UUID + 同步引用，可改 name |
 | `rule_clone_entry.py` | 只克隆入口规则 N 份，子规则共享不变 |
+| `rule_clone_rule.py` | 按 id 复制一条子规则 N 份（独立副本，换新 UUID + `_copyN`） |
 | `rule_link_conditionmatch.py` | 入口规则 + 子规则组装成 conditionMatch 规则链 |
 | `excel_inspect.py` | 日志预检 |
 | `excel_device_log_join.py` | 设备清单 × 多份日志按 IP 关联 |
@@ -92,7 +94,7 @@ python -c "import sys, pandas, openpyxl; print(sys.executable)"
 - Excel 验证会直接打开输出文件并返回 Sheet 名、行数、列名等结构化统计。
 - 旧脚本内建验证与统一层验证并列执行，任一失败则总体验证失败。
 - 现有独立脚本旧调用方式继续可用；迁移阶段不做破坏性删除。
-- CI 安装 `requirements.txt` 后真实执行全部 11 个统一 CLI 命令，不只检查 `--help` / `--dry-run`。
+- CI 安装 `requirements.txt` 后真实执行全部 12 个统一 CLI 命令，不只检查 `--help` / `--dry-run`。
 - 新增正式脚本必须在 `common/registry.py` 注册，并增加至少一个真实 E2E，否则不应视为完成统一 CLI 接入。
 
 ## 迭代

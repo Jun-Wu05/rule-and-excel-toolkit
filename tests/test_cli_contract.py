@@ -19,7 +19,7 @@ class CliContractTests(unittest.TestCase):
     def test_command_ids_are_unique(self):
         ids = [c.command_id for c in COMMANDS]
         self.assertEqual(len(ids), len(set(ids)))
-        self.assertEqual(len(ids), 11)
+        self.assertEqual(len(ids), 12)
 
     def test_registered_scripts_exist(self):
         for spec in COMMANDS:

@@ -43,6 +43,7 @@ python scripts/toolkit.py <rule|excel> <command> --input <path> [--output <path>
 | 清空/删除 normalize field | `rule clear-field` |
 | 替换 UUID | `rule reuuid` |
 | 克隆入口规则 | `rule clone-entry` |
+| 克隆指定子规则 N 份 | `rule clone-rule` |
 | 组装规则链 | `rule link` |
 | Excel 预检 | `excel inspect` |
 | Excel 字段提取 | `excel extract` |
@@ -93,6 +94,7 @@ python -c "import sys, pandas, openpyxl; print(sys.executable)"
 - 替换顶层 UUID 并同步引用；
 - 复制/克隆整批规则；
 - 只克隆入口规则、子规则共享；
+- 只复制某一条子规则 N 份（name 加 `_copyN`、换新 UUID、独立不接线）；
 - 组装入口规则与子规则为 `conditionMatch` 规则链。
 
 ### Excel 日志
@@ -120,6 +122,7 @@ python -c "import sys, pandas, openpyxl; print(sys.executable)"
 | Base64 txt | 清空/删除 normalize field | `rule clear-field` | `rule_clear_field.py` |
 | Base64 txt | 换 UUID / 复制整批规则 / 改 name | `rule reuuid` | `rule_replace_uuid.py` |
 | Base64 txt | 只克隆入口规则 N 份，子规则共享 | `rule clone-entry` | `rule_clone_entry.py` |
+| Base64 txt | 复制某一条子规则 N 份（独立副本） | `rule clone-rule` | `rule_clone_rule.py` |
 | Base64 txt | 入口规则 + 子规则组装规则链 | `rule link` | `rule_link_conditionmatch.py` |
 | .xlsx | 提取/去重/拆分前预检 | `excel inspect` | `excel_inspect.py` |
 | 设备清单 + 日志 xlsx | 按 IP 关联汇总 | `excel join` | `excel_device_log_join.py` |
@@ -187,7 +190,23 @@ python scripts/rule_clone_entry.py <输入.txt> [输出.txt] [--suffixes _new1,_
 
 它与 `rule_replace_uuid.py` 的区别：后者处理整批规则 UUID；本脚本只克隆入口规则。
 
-### 6.5 `rule_link_conditionmatch.py`
+### 6.5 `rule_clone_rule.py`
+
+按顶层 `id` 精确选中一条规则（通常是自包含的“子规则”），深拷贝 N 份追加到数组末尾。每份副本：顶层 `id` 换成新 UUID，`name` 尾部加后缀 `_copy1`…`_copyN`。不接线：入口规则与其他规则原样不动，副本为独立规则、未被任何规则引用。
+
+```bash
+python scripts/rule_clone_rule.py <输入.txt> [输出.txt] --rule-id <uuid> --count <N> [--suffix _copy]
+```
+
+与其它克隆类能力的区别：
+
+| 能力 | 选中对象 | 副本数量 | 接线 |
+|---|---|---|---|
+| `rule clone-entry` | 所有入口规则 | 按 `--suffixes` 列表 | 副本继续 `case.rule.ref` 引用原子规则 |
+| `rule clone-rule` | 指定 `--rule-id` 的一条规则 | 按 `--count` 整数 | 不接线，独立副本 |
+| `rule reuuid` | 整批规则 | 1:1（不增数量） | 同步全量引用 |
+
+### 6.6 `rule_link_conditionmatch.py`
 
 识别入口规则（`subResolver=0`）和子规则（`subResolver=1`），在入口规则 `parser.filter` 中构建 `conditionMatch`，把子规则 UUID 写入 `cases[].rule.ref`。
 
@@ -280,6 +299,7 @@ python scripts/excel_dedup_sheets.py <输入.xlsx> <输出.xlsx> \
 | 加层级编号 / 01_ / 0101_ | 按 ref 生成编号 | `rule hierarchy` |
 | 换 UUID / 重新出规则 ID / 复制整批规则 | 顶层 UUID 全换并同步引用 | `rule reuuid` |
 | 只复制入口规则 | 子规则共享不变 | `rule clone-entry` |
+| 复制某一条子规则 N 条 | 独立副本，新 UUID + `_copyN`，不接线 | `rule clone-rule` |
 
 缺少真正阻塞执行的关键参数时只问一次；能通过预检、脚本默认值或现有文件结构推断的，不重复询问。
 
